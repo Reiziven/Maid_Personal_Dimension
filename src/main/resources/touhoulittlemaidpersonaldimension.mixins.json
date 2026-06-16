@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.tlmpersonal.tlmpersonaldimension.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BeehiveBlockEntityMixin",
+    "MinecraftServerMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
