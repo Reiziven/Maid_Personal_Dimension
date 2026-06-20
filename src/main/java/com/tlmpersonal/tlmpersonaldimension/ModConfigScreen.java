@@ -87,7 +87,7 @@ public class ModConfigScreen {
                 .setSaveConsumer(Config.ENABLE_BLOCK_BUILDING::set)
                 .build());
         general.addEntry(entryBuilder.startBooleanToggle(Component.literal("Use Maid GUI Controls (4th Tab)"), Config.USE_MAID_GUI_CONTROLS.get())
-                .setDefaultValue(true)
+                .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, the buttons will be directly inside the maid's GUI (4th tab). If false, clicking the 4th tab's art will open the full-screen mod GUI."))
                 .setSaveConsumer(Config.USE_MAID_GUI_CONTROLS::set)
                 .build());

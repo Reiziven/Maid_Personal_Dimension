@@ -81,6 +81,7 @@ public class TouhouLittleMaidCompat {
                 if (this.active && this.visible && this.isHoveredOrFocused()) {
                     if (button == 1) { // Right Click
                         if (Minecraft.getInstance().player != null) {
+                            gui.onClose();
                             Minecraft.getInstance().setScreen(new PersonalDimensionGui(gui.getMaid()));
                             return true;
                         }
@@ -96,6 +97,7 @@ public class TouhouLittleMaidCompat {
     private static void openPersonalTab(AbstractMaidContainerGui<?> gui) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null && gui.getMaid() != null) {
+            gui.onClose();
             mc.setScreen(new PersonalDimensionMaidScreen(
                 new PersonalDimensionMenu(0, mc.player.getInventory(), gui.getMaid().getId()),
                 mc.player.getInventory(),
@@ -133,6 +135,7 @@ public class TouhouLittleMaidCompat {
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (this.visible && this.isHoveredOrFocused() && button == 1) {
+                gui.onClose();
                 Minecraft.getInstance().setScreen(new PersonalDimensionGui(gui.getMaid()));
                 return true;
             }
@@ -144,6 +147,7 @@ public class TouhouLittleMaidCompat {
         private final AbstractMaidContainerGui<?> gui;
         public InvisibleIslandButton(int x, int y, int w, int h, AbstractMaidContainerGui<?> gui) {
             super(x, y, w, h, Component.empty(), b -> {
+                gui.onClose();
                 Minecraft.getInstance().setScreen(new PersonalDimensionMainGui(gui.getMaid()));
             }, DEFAULT_NARRATION);
             this.gui = gui;

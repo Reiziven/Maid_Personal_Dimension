@@ -32,15 +32,13 @@ import org.jetbrains.annotations.NotNull;
 
 public record PersonalDimensionGuiPacket(Action action, String data, int maidId) implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<PersonalDimensionGuiPacket> TYPE = new CustomPacketPayload.Type<>(
-            Touhoulittlemaidpersonaldimension.id("personal_dimension_gui")
-    );
+            Touhoulittlemaidpersonaldimension.id("personal_dimension_gui"));
 
     public static final StreamCodec<ByteBuf, PersonalDimensionGuiPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, PersonalDimensionGuiPacket::actionName,
             ByteBufCodecs.STRING_UTF8, PersonalDimensionGuiPacket::data,
             ByteBufCodecs.INT, PersonalDimensionGuiPacket::maidId,
-            (name, data, id) -> new PersonalDimensionGuiPacket(Action.valueOf(name), data, id)
-    );
+            (name, data, id) -> new PersonalDimensionGuiPacket(Action.valueOf(name), data, id));
 
     private String actionName() {
         return action.name();
@@ -73,35 +71,40 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
         SET_DIMENSION_TYPE,
         REQUEST_SYNC,
         REQUEST_TELEPORTER_COOLDOWN,
-        GET_TELEPORTER
+        GET_TELEPORTER,
+        SET_DOMAIN_EXPANSION_DIMENSION_RULES,
+        SET_DOMAIN_EXPANSION_ENTITY_PROTECTION
     }
 
     public static void handle(PersonalDimensionGuiPacket message, IPayloadContext context) {
         if (context.flow().isServerbound()) {
             context.enqueueWork(() -> {
-            ServerPlayer sender = (ServerPlayer) context.player();
-            if (sender == null) return;
+                ServerPlayer sender = (ServerPlayer) context.player();
+                if (sender == null)
+                    return;
 
-            ServerLevel level = sender.serverLevel();
-            Entity entity = level.getEntity(message.maidId());
-            if (!(entity instanceof EntityMaid maid)) return;
+                ServerLevel level = sender.serverLevel();
+                Entity entity = level.getEntity(message.maidId());
+                if (!(entity instanceof EntityMaid maid))
+                    return;
 
-        PersonalDimensionSavedData savedData = PersonalDimensionSavedData.get(level);
-        PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(sender.getUUID());
-        
-        // Use clean name for tracking
-        String playerName = sender.getGameProfile().getName();
-        boolean foundSelf = false;
-        for (String allowed : settings.getAllowedPlayers()) {
-            if (allowed.equalsIgnoreCase(playerName)) {
-                foundSelf = true;
-                break;
-            }
-        }
-        if (!foundSelf) {
-            settings.getAllowedPlayers().add(playerName);
-            savedData.setDirty();
-        }
+                PersonalDimensionSavedData savedData = PersonalDimensionSavedData.get(level);
+                PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData
+                        .getOrCreateSettings(sender.getUUID());
+
+                // Use clean name for tracking
+                String playerName = sender.getGameProfile().getName();
+                boolean foundSelf = false;
+                for (String allowed : settings.getAllowedPlayers()) {
+                    if (allowed.equalsIgnoreCase(playerName)) {
+                        foundSelf = true;
+                        break;
+                    }
+                }
+                if (!foundSelf) {
+                    settings.getAllowedPlayers().add(playerName);
+                    savedData.setDirty();
+                }
 
                 if (message.action() == Action.REQUEST_SYNC) {
                     syncSettings(sender, settings);
@@ -120,7 +123,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                 }
 
                 if (maid.getFavorabilityManager().getLevel() < 3) {
-                    sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.favorability_too_low"));
+                    sender.sendSystemMessage(
+                            Component.translatable("message.tlmpersonaldimension.favorability_too_low"));
                     return;
                 }
 
@@ -129,14 +133,16 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         String entityId = message.data().trim();
                         if (!entityId.isEmpty()) {
                             boolean skipCosts = Config.ALLOW_FREE_WHITELIST.get();
-                            if (skipCosts || tryConsumeCosts(sender, maid, Config.WHITELIST_BLACKLIST_COST_POWER_POINTS.get(), Config.WHITELIST_BLACKLIST_COST_XP.get(), true)) {
+                            if (skipCosts
+                                    || tryConsumeCosts(sender, maid, Config.WHITELIST_BLACKLIST_COST_POWER_POINTS.get(),
+                                            Config.WHITELIST_BLACKLIST_COST_XP.get(), true)) {
                                 settings.getAllowedEntities().add(entityId);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case REMOVE_ALLOWED_ENTITY: {
                         String entityId = message.data().trim();
@@ -146,20 +152,22 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                             syncSettings(sender, settings);
                         }
                     }
-                    break;
+                        break;
 
                     case ADD_BLOCKED_ENTITY: {
                         String entityId = message.data().trim();
                         if (!entityId.isEmpty()) {
                             boolean skipCosts = Config.ALLOW_FREE_WHITELIST.get();
-                            if (skipCosts || tryConsumeCosts(sender, maid, Config.WHITELIST_BLACKLIST_COST_POWER_POINTS.get(), Config.WHITELIST_BLACKLIST_COST_XP.get(), true)) {
+                            if (skipCosts
+                                    || tryConsumeCosts(sender, maid, Config.WHITELIST_BLACKLIST_COST_POWER_POINTS.get(),
+                                            Config.WHITELIST_BLACKLIST_COST_XP.get(), true)) {
                                 settings.getBlockedEntities().add(entityId);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case REMOVE_BLOCKED_ENTITY: {
                         String entityId = message.data().trim();
@@ -169,7 +177,7 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                             syncSettings(sender, settings);
                         }
                     }
-                    break;
+                        break;
 
                     case ADD_ALLOWED_PLAYER: {
                         String player = message.data().trim();
@@ -179,7 +187,7 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                             syncSettings(sender, settings);
                         }
                     }
-                    break;
+                        break;
 
                     case REMOVE_ALLOWED_PLAYER: {
                         String playerToRemove = message.data().trim();
@@ -187,24 +195,28 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                             settings.getAllowedPlayers().remove(playerToRemove);
                             savedData.setDirty();
                             syncSettings(sender, settings);
-                            
+
                             for (ResourceKey<Level> dimKey : sender.server.levelKeys()) {
                                 if (Touhoulittlemaidpersonaldimension.isOurDimension(dimKey)) {
                                     ServerLevel dimLevel = sender.server.getLevel(dimKey);
-                                    if (dimLevel == null) continue;
-                                    
+                                    if (dimLevel == null)
+                                        continue;
+
                                     for (ServerPlayer targetPlayer : dimLevel.players()) {
                                         UUID islandOwner;
                                         if (Config.PRIVATE_DIMENSION.get()) {
-                                            islandOwner = Touhoulittlemaidpersonaldimension.getOwnerUUIDFromDimensionKey(dimLevel.dimension());
+                                            islandOwner = Touhoulittlemaidpersonaldimension
+                                                    .getOwnerUUIDFromDimensionKey(dimLevel.dimension());
                                         } else {
-                                            islandOwner = Touhoulittlemaidpersonaldimension.getOwnerUUIDFromPosition(dimLevel, targetPlayer.getX(), targetPlayer.getZ());
+                                            islandOwner = Touhoulittlemaidpersonaldimension.getOwnerUUIDFromPosition(
+                                                    dimLevel, targetPlayer.getX(), targetPlayer.getZ());
                                         }
 
                                         if (islandOwner != null && islandOwner.equals(sender.getUUID())) {
                                             String targetName = targetPlayer.getGameProfile().getName();
                                             String targetUUID = targetPlayer.getUUID().toString();
-                                            if (targetName.equalsIgnoreCase(playerToRemove) || targetUUID.equals(playerToRemove)) {
+                                            if (targetName.equalsIgnoreCase(playerToRemove)
+                                                    || targetUUID.equals(playerToRemove)) {
                                                 Touhoulittlemaidpersonaldimension.processRemoval(targetPlayer);
                                             }
                                         }
@@ -213,179 +225,204 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_ALLOW_ALL_ENTITIES: {
                         boolean canChange = Config.ALLOW_CHEAT_CONFIGS.get() || Config.ALLOW_ALLOW_ALL_ENTITIES.get();
                         if (canChange) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.ALLOW_ALL_COST_POWER_POINTS.get(), Config.ALLOW_ALL_COST_XP.get(), true)) {
+                            if (tryConsumeCosts(sender, maid, Config.ALLOW_ALL_COST_POWER_POINTS.get(),
+                                    Config.ALLOW_ALL_COST_XP.get(), true)) {
                                 settings.setAllowAllEntities(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_DISABLE_HOSTILE_ENTITIES: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DISABLE_HOSTILE_COST_POWER_POINTS.get(), Config.DISABLE_HOSTILE_COST_XP.get(), true)) {
+                            if (tryConsumeCosts(sender, maid, Config.DISABLE_HOSTILE_COST_POWER_POINTS.get(),
+                                    Config.DISABLE_HOSTILE_COST_XP.get(), true)) {
                                 settings.setDisableHostileEntities(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_DISABLE_HUNGER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_DISABLE_MAID_DEATH: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_DISABLE_PLAYER_DEATH: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_NATURAL_HEALING: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_BLOCK_HARMFUL_EFFECTS: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_MAID_EMIT_LIGHT: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_LOCK_DAY: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockDay(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
-                                ServerLevel personalDim = PlayerDimensionManager.getExistingPlayerDimension(sender.server, sender.getUUID());
-                                if (personalDim != null && value) personalDim.setDayTime(settings.getLockedDayTime());
+                                ServerLevel personalDim = PlayerDimensionManager
+                                        .getExistingPlayerDimension(sender.server, sender.getUUID());
+                                if (personalDim != null && value)
+                                    personalDim.setDayTime(settings.getLockedDayTime());
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_LOCKED_DAY_TIME: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             try {
                                 int time = Integer.parseInt(message.data());
-                                if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                                if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                        Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                     settings.setLockedDayTime(time);
                                     savedData.setDirty();
                                     syncSettings(sender, settings);
                                     if (settings.isLockDay()) {
-                                        ServerLevel personalDim = PlayerDimensionManager.getExistingPlayerDimension(sender.server, sender.getUUID());
-                                        if (personalDim != null) personalDim.setDayTime(time);
+                                        ServerLevel personalDim = PlayerDimensionManager
+                                                .getExistingPlayerDimension(sender.server, sender.getUUID());
+                                        if (personalDim != null)
+                                            personalDim.setDayTime(time);
                                     }
                                 }
-                            } catch (NumberFormatException ignored) {}
+                            } catch (NumberFormatException ignored) {
+                            }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_LOCK_WEATHER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockWeather(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (value) {
-                                    ServerLevel personalDim = PlayerDimensionManager.getExistingPlayerDimension(sender.server, sender.getUUID());
-                                    if (personalDim != null) applyWeather(personalDim, settings.isLockedWeatherRain(), settings.isLockedWeatherThunder());
+                                    ServerLevel personalDim = PlayerDimensionManager
+                                            .getExistingPlayerDimension(sender.server, sender.getUUID());
+                                    if (personalDim != null)
+                                        applyWeather(personalDim, settings.isLockedWeatherRain(),
+                                                settings.isLockedWeatherThunder());
                                 }
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_LOCKED_WEATHER_RAIN: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockedWeatherRain(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (settings.isLockWeather()) {
-                                    ServerLevel personalDim = PlayerDimensionManager.getExistingPlayerDimension(sender.server, sender.getUUID());
-                                    if (personalDim != null) applyWeather(personalDim, value, settings.isLockedWeatherThunder());
+                                    ServerLevel personalDim = PlayerDimensionManager
+                                            .getExistingPlayerDimension(sender.server, sender.getUUID());
+                                    if (personalDim != null)
+                                        applyWeather(personalDim, value, settings.isLockedWeatherThunder());
                                 }
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_LOCKED_WEATHER_THUNDER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockedWeatherThunder(value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (settings.isLockWeather()) {
-                                    ServerLevel personalDim = PlayerDimensionManager.getExistingPlayerDimension(sender.server, sender.getUUID());
-                                    if (personalDim != null) applyWeather(personalDim, settings.isLockedWeatherRain(), value);
+                                    ServerLevel personalDim = PlayerDimensionManager
+                                            .getExistingPlayerDimension(sender.server, sender.getUUID());
+                                    if (personalDim != null)
+                                        applyWeather(personalDim, settings.isLockedWeatherRain(), value);
                                 }
                             }
                         }
                     }
-                    break;
+                        break;
 
                     case SET_TAMED_MAID_PROTECTION: {
                         boolean value = Boolean.parseBoolean(message.data());
@@ -393,40 +430,61 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         savedData.setDirty();
                         syncSettings(sender, settings);
                     }
-                    break;
+                        break;
                     case SET_ENTITY_CANNOT_TARGET: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_MAID_AUTHORITY: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
                     case SET_MAID_ATTACK_DISCARD: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(), Config.DIMENSION_RULES_COST_XP.get(), false)) {
+                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                    Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
                         }
                     }
-                    break;
+                        break;
+                    case SET_DOMAIN_EXPANSION_DIMENSION_RULES: {
+                        if (Config.ALLOW_CHEAT_CONFIGS.get()) {
+                            boolean value = Boolean.parseBoolean(message.data());
+                            settings.setDomainExpansionUseDimensionRules(value);
+                            savedData.setDirty();
+                            syncSettings(sender, settings);
+                        }
+                    }
+                        break;
+                    case SET_DOMAIN_EXPANSION_ENTITY_PROTECTION: {
+                        if (Config.ALLOW_CHEAT_CONFIGS.get()) {
+                            boolean value = Boolean.parseBoolean(message.data());
+                            settings.setDomainExpansionUseEntityProtection(value);
+                            savedData.setDirty();
+                            syncSettings(sender, settings);
+                        }
+                    }
+                        break;
 
                     case SET_DIMENSION_TYPE: {
                         try {
@@ -439,22 +497,26 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                                 case NORMAL -> "gui.tlmpersonaldimension.dim_type.normal";
                                 case CHERRY -> "gui.tlmpersonaldimension.dim_type.cherry";
                             };
-                            sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.dim_type_set", Component.translatable(typeNameKey)));
-                        } catch (Exception ignored) {}
+                            sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.dim_type_set",
+                                    Component.translatable(typeNameKey)));
+                        } catch (Exception ignored) {
+                        }
                     }
-                    break;
+                        break;
                 }
             });
         }
     }
 
     private static void syncSettings(ServerPlayer player, PersonalDimensionSavedData.PlayerDimensionSettings settings) {
-        PacketDistributor.sendToPlayer(player, new PersonalDimensionSettingsSyncPacket(settings.save(), Config.ALLOW_CHEAT_CONFIGS.get()));
+        PacketDistributor.sendToPlayer(player,
+                new PersonalDimensionSettingsSyncPacket(settings.save(), Config.ALLOW_CHEAT_CONFIGS.get()));
     }
 
-    private static boolean tryConsumeCosts(ServerPlayer player, EntityMaid maid, double powerCostVal, int xpCost, boolean needCake) {
+    private static boolean tryConsumeCosts(ServerPlayer player, EntityMaid maid, double powerCostVal, int xpCost,
+            boolean needCake) {
         PowerAttachment powerData = player.getData(InitDataAttachment.POWER_NUM);
-        
+
         if (powerCostVal > 0.0 && powerData.get() < (float) powerCostVal) {
             player.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.not_enough_power"));
             return false;
@@ -467,7 +529,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
 
         if (needCake) {
             if (!hasCake(player)) {
-                player.sendSystemMessage(Component.literal("Need a cake to convince maid as it's her personal dimension"));
+                player.sendSystemMessage(
+                        Component.literal("Need a cake to convince maid as it's her personal dimension"));
                 return false;
             }
             consumeCake(player);
@@ -477,7 +540,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
             powerData.min((float) powerCostVal);
             syncPowerToClient(player);
         }
-        if (xpCost > 0) player.giveExperienceLevels(-xpCost);
+        if (xpCost > 0)
+            player.giveExperienceLevels(-xpCost);
 
         return true;
     }
@@ -490,7 +554,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
 
     private static boolean hasCake(ServerPlayer player) {
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            if (player.getInventory().getItem(i).is(Items.CAKE)) return true;
+            if (player.getInventory().getItem(i).is(Items.CAKE))
+                return true;
         }
         return false;
     }
@@ -504,7 +569,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
         }
     }
 
-    private static void applySetting(Action action, PersonalDimensionSavedData.PlayerDimensionSettings settings, boolean value) {
+    private static void applySetting(Action action, PersonalDimensionSavedData.PlayerDimensionSettings settings,
+            boolean value) {
         switch (action) {
             case SET_DISABLE_HUNGER -> settings.setDisableHunger(value);
             case SET_DISABLE_MAID_DEATH -> settings.setDisableMaidDeath(value);
@@ -515,7 +581,8 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
             case SET_ENTITY_CANNOT_TARGET -> settings.setEntityCannotTarget(value);
             case SET_MAID_AUTHORITY -> settings.setMaidAuthority(value);
             case SET_MAID_ATTACK_DISCARD -> settings.setMaidAttackDiscard(value);
-            default -> {}
+            default -> {
+            }
         }
     }
 
@@ -542,18 +609,24 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
         }
         ItemStack teleporter = new ItemStack(Touhoulittlemaidpersonaldimension.MAID_TELEPORTER.get());
         MaidTeleporter.setOwnerInfo(teleporter, sender.getUUID(), sender.getGameProfile().getName());
-        if (!sender.getInventory().add(teleporter)) sender.drop(teleporter, false);
+        if (!sender.getInventory().add(teleporter))
+            sender.drop(teleporter, false);
         savedData.setTeleporterCooldown(playerId, now);
         sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.teleporter_given"));
         PacketDistributor.sendToPlayer(sender, new TeleporterCooldownSyncPacket(now + COOLDOWN_MS));
     }
 
     private static void applyWeather(ServerLevel level, boolean rain, boolean thunder) {
-        if (thunder) level.setWeatherParameters(0, 1000000, true, true);
-        else if (rain) level.setWeatherParameters(0, 1000000, true, false);
-        else level.setWeatherParameters(1000000, 0, false, false);
+        if (thunder)
+            level.setWeatherParameters(0, 1000000, true, true);
+        else if (rain)
+            level.setWeatherParameters(0, 1000000, true, false);
+        else
+            level.setWeatherParameters(1000000, 0, false, false);
     }
 
     @Override
-    public @NotNull Type<? extends CustomPacketPayload> type() { return TYPE; }
+    public @NotNull Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
 }

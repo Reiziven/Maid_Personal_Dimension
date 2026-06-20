@@ -254,6 +254,23 @@ public class PersonalDimensionGui extends Screen {
                     })
                     .build());
             y += 50;
+            addScrollingWidget(Checkbox.builder(Component.literal("Domain Dim Rules"), this.font)
+                    .pos(centerX + 10, y)
+                    .selected(localSettings != null && localSettings.isDomainExpansionUseDimensionRules())
+                    .onValueChange((checkbox, selected) -> {
+                        localSettings.setDomainExpansionUseDimensionRules(selected);
+                        sendPacket(PersonalDimensionGuiPacket.Action.SET_DOMAIN_EXPANSION_DIMENSION_RULES, String.valueOf(selected));
+                    })
+                    .build());
+            addScrollingWidget(Checkbox.builder(Component.literal("Domain Entities Rules"), this.font)
+                    .pos(centerX + 165, y)
+                    .selected(localSettings != null && localSettings.isDomainExpansionUseEntityProtection())
+                    .onValueChange((checkbox, selected) -> {
+                        localSettings.setDomainExpansionUseEntityProtection(selected);
+                        sendPacket(PersonalDimensionGuiPacket.Action.SET_DOMAIN_EXPANSION_ENTITY_PROTECTION, String.valueOf(selected));
+                    })
+                    .build());
+            y += 25;
             Config.DimensionType currentType = localSettings != null && localSettings.getDimensionType() != null ? localSettings.getDimensionType() : Config.DIMENSION_TYPE.get();
             String displayDim = switch (currentType) {
                 case VOID -> "MAID ISLAND";

@@ -172,8 +172,7 @@ public record TeleportToPersonalDimensionPacket(int maidId, boolean teleportWith
             if (Touhoulittlemaidpersonaldimension.isOurDimension(targetDim.dimension())) {
                 targetX = 0.5;
                 targetZ = 0.5;
-                BlockPos targetPos = new BlockPos((int)targetX, 100, (int)targetZ);
-                StructurePlacer.placeSkyIsland(targetDim, targetPos);
+                StructurePlacer.tryPlaceStructure(targetDim);
                 targetY = Touhoulittlemaidpersonaldimension.findSafeSurfaceY(targetDim, (int)targetX, (int)targetZ);
             } else {
                 BlockPos spawn = targetDim.getSharedSpawnPos();

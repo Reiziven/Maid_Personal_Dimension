@@ -25,12 +25,18 @@ public class StructurePlacer {
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Resetting placedIslands for new server start!");
     }
 
+    private static int getSafeSpawnY(ServerLevel level, int x, int z) {
+        if (Config.DIMENSION_TYPE.get() == Config.DimensionType.VOID) {
+            return 64;
+        }
+        return 200;
+    }
+
     public static void tryPlaceStructure(ServerLevel level) {
         Set<BlockPos> levelIslands = placedIslands.computeIfAbsent(level.dimension(), k -> new HashSet<>());
         if (levelIslands.contains(BlockPos.ZERO)) return;
 
-        // Place structure at Y=100 for normal/cherry dimensions, Y=64 for void
-        int spawnY = Config.DIMENSION_TYPE.get() == Config.DimensionType.VOID ? 64 : 100;
+        int spawnY = getSafeSpawnY(level, 0, 0);
         placeStructureAt(level, new BlockPos(0, spawnY, 0));
         levelIslands.add(BlockPos.ZERO);
     }
@@ -47,7 +53,7 @@ public class StructurePlacer {
         // Generate random position within 64-128 blocks of player
         int offsetX = playerPos.getX() + level.random.nextInt(128) - 64;
         int offsetZ = playerPos.getZ() + level.random.nextInt(128) - 64;
-        int spawnY = 100;
+        int spawnY = getSafeSpawnY(level, offsetX, offsetZ);
         BlockPos spawnPos = new BlockPos(offsetX, spawnY, offsetZ);
         
         Set<BlockPos> levelIslands = placedIslands.computeIfAbsent(level.dimension(), k -> new HashSet<>());

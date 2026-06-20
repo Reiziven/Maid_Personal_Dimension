@@ -258,8 +258,7 @@ public class MaidTeleporter extends Item {
             if (Touhoulittlemaidpersonaldimension.isOurDimension(targetDim)) {
                 targetX = 0.5;
                 targetZ = 0.5;
-                BlockPos targetPos = new BlockPos((int)targetX, 100, (int)targetZ);
-                StructurePlacer.placeSkyIsland(targetLevel, targetPos);
+                StructurePlacer.tryPlaceStructure(targetLevel);
                 targetY = Touhoulittlemaidpersonaldimension.findSafeSurfaceY(targetLevel, (int)targetX, (int)targetZ);
             } else {
                 BlockPos spawnPos = targetLevel.getSharedSpawnPos();

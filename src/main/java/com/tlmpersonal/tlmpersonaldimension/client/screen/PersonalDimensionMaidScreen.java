@@ -69,6 +69,7 @@ public class PersonalDimensionMaidScreen extends AbstractMaidContainerGui<Person
             this.addRenderableWidget(new TransparentButton(left + 8, top + 105, 160, 20, Component.literal("Dimensional Control"),
                 button -> {
                     if (this.minecraft != null) {
+                        this.onClose();
                         this.minecraft.setScreen(new PersonalDimensionGui(maid));
                     }
                 }));
@@ -168,6 +169,7 @@ public class PersonalDimensionMaidScreen extends AbstractMaidContainerGui<Person
                 }
             } else if (button == 0 && !Config.USE_MAID_GUI_CONTROLS.get()) { // Left Click (Mode B only)
                 if (this.minecraft != null) {
+                    this.onClose();
                     this.minecraft.setScreen(new PersonalDimensionMainGui(maid));
                     return true;
                 }

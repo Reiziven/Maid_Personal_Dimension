@@ -21,7 +21,8 @@ import java.util.UUID;
 public class PersonalDimensionSavedData extends SavedData {
     public static final String DATA_NAME = Touhoulittlemaidpersonaldimension.MODID + "_personal_dimension_data";
 
-    public record Pair<T1, T2>(T1 first, T2 second) {}
+    public record Pair<T1, T2>(T1 first, T2 second) {
+    }
 
     private static final String TAG_PLAYERS = "players";
     private static final String TAG_TELEPORTER_COOLDOWNS = "teleporter_cooldowns";
@@ -39,12 +40,12 @@ public class PersonalDimensionSavedData extends SavedData {
     private final Set<UUID> privateDimensions = new HashSet<>();
     // Track tamed maids: maid UUID -> (owner UUID, last level, last position)
     private final Map<UUID, MaidInfo> trackedMaids = new HashMap<>();
-    
+
     public static class MaidInfo {
         public UUID ownerUuid;
         public ResourceKey<Level> lastLevel;
         public double lastX, lastY, lastZ;
-        
+
         public MaidInfo(UUID ownerUuid, ResourceKey<Level> lastLevel, double lastX, double lastY, double lastZ) {
             this.ownerUuid = ownerUuid;
             this.lastLevel = lastLevel;
@@ -52,7 +53,7 @@ public class PersonalDimensionSavedData extends SavedData {
             this.lastY = lastY;
             this.lastZ = lastZ;
         }
-        
+
         public CompoundTag save() {
             CompoundTag tag = new CompoundTag();
             tag.putUUID("ownerUuid", ownerUuid);
@@ -62,10 +63,11 @@ public class PersonalDimensionSavedData extends SavedData {
             tag.putDouble("lastZ", lastZ);
             return tag;
         }
-        
+
         public static MaidInfo load(CompoundTag tag) {
             UUID ownerUuid = tag.getUUID("ownerUuid");
-            ResourceKey<Level> lastLevel = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(tag.getString("lastLevel")));
+            ResourceKey<Level> lastLevel = ResourceKey.create(Registries.DIMENSION,
+                    ResourceLocation.parse(tag.getString("lastLevel")));
             double lastX = tag.getDouble("lastX");
             double lastY = tag.getDouble("lastY");
             double lastZ = tag.getDouble("lastZ");
@@ -82,14 +84,13 @@ public class PersonalDimensionSavedData extends SavedData {
         PersonalDimensionSavedData data = overworld.getDataStorage().computeIfAbsent(
                 new Factory<>(
                         PersonalDimensionSavedData::new,
-                        (tag, registries) -> new PersonalDimensionSavedData(tag, registries)
-                ),
-                DATA_NAME
-        );
+                        (tag, registries) -> new PersonalDimensionSavedData(tag, registries)),
+                DATA_NAME);
         return data;
     }
 
-    public PersonalDimensionSavedData() {}
+    public PersonalDimensionSavedData() {
+    }
 
     public PersonalDimensionSavedData(CompoundTag tag, HolderLookup.Provider registries) {
         load(tag, registries);
@@ -158,7 +159,7 @@ public class PersonalDimensionSavedData extends SavedData {
                 privateDimensions.add(UUID.fromString(list.getString(i)));
             }
         }
-        
+
         if (tag.contains("trackedMaids")) {
             CompoundTag maidsTag = tag.getCompound("trackedMaids");
             for (String uuidStr : maidsTag.getAllKeys()) {
@@ -209,7 +210,7 @@ public class PersonalDimensionSavedData extends SavedData {
             privateList.add(StringTag.valueOf(uuid.toString()));
         }
         tag.put(TAG_PRIVATE_DIMENSIONS, privateList);
-        
+
         CompoundTag maidsTag = new CompoundTag();
         for (Map.Entry<UUID, MaidInfo> entry : trackedMaids.entrySet()) {
             maidsTag.put(entry.getKey().toString(), entry.getValue().save());
@@ -220,7 +221,8 @@ public class PersonalDimensionSavedData extends SavedData {
     }
 
     public PlayerDimensionSettings getOrCreateSettings(UUID playerUuid) {
-        PlayerDimensionSettings settings = playerSettings.computeIfAbsent(playerUuid, k -> new PlayerDimensionSettings());
+        PlayerDimensionSettings settings = playerSettings.computeIfAbsent(playerUuid,
+                k -> new PlayerDimensionSettings());
         if (settings.getAllowedPlayers().isEmpty()) {
             settings.getAllowedPlayers().add(playerUuid.toString());
             setDirty();
@@ -229,7 +231,8 @@ public class PersonalDimensionSavedData extends SavedData {
     }
 
     public Pair<Integer, Integer> getOrCreatePlayerGrid(UUID playerUuid) {
-        if (playerGrids.containsKey(playerUuid)) return playerGrids.get(playerUuid);
+        if (playerGrids.containsKey(playerUuid))
+            return playerGrids.get(playerUuid);
         long seed = playerUuid.getMostSignificantBits();
         Random rand = new Random(seed);
         int gridX = rand.nextInt(2000) - 1000;
@@ -304,28 +307,39 @@ public class PersonalDimensionSavedData extends SavedData {
 
         private boolean tamedMaidProtection = false;
         private long lastTamedMaidProtectionUse = 0L;
+        private long lastDomainExpansionUse = 0L;
         private boolean entityCannotTarget = false;
         private boolean maidAuthority = false;
         private boolean maidAttackDiscard = false;
         private Config.DimensionType dimensionType = null;
 
-        public PlayerDimensionSettings() {}
+        // Domain Expansion per-player overrides
+        private boolean domainExpansionUseDimensionRules = true;
+        private boolean domainExpansionUseEntityProtection = true;
+        // Per-maid cooldown tracking: maid UUID string -> last activation time ms
+        private final Map<String, Long> domainExpansionCooldowns = new HashMap<>();
+
+        public PlayerDimensionSettings() {
+        }
 
         public static PlayerDimensionSettings load(CompoundTag tag) {
             PlayerDimensionSettings settings = new PlayerDimensionSettings();
             if (tag.contains("allowedEntities")) {
                 ListTag list = tag.getList("allowedEntities", 8);
-                for (int i = 0; i < list.size(); i++) settings.allowedEntities.add(list.getString(i));
+                for (int i = 0; i < list.size(); i++)
+                    settings.allowedEntities.add(list.getString(i));
             }
             if (tag.contains("blockedEntities")) {
                 ListTag list = tag.getList("blockedEntities", 8);
-                for (int i = 0; i < list.size(); i++) settings.blockedEntities.add(list.getString(i));
+                for (int i = 0; i < list.size(); i++)
+                    settings.blockedEntities.add(list.getString(i));
             }
             settings.allowAllEntities = tag.getBoolean("allowAllEntities");
             settings.disableHostileEntities = tag.getBoolean("disableHostileEntities");
             if (tag.contains("allowedPlayers")) {
                 ListTag list = tag.getList("allowedPlayers", 8);
-                for (int i = 0; i < list.size(); i++) settings.allowedPlayers.add(list.getString(i));
+                for (int i = 0; i < list.size(); i++)
+                    settings.allowedPlayers.add(list.getString(i));
             }
             settings.disableHunger = tag.getBoolean("disableHunger");
             settings.disableMaidDeath = tag.getBoolean("disableMaidDeath");
@@ -338,27 +352,52 @@ public class PersonalDimensionSavedData extends SavedData {
             settings.lockWeather = tag.getBoolean("lockWeather");
             settings.lockedWeatherRain = tag.getBoolean("lockedWeatherRain");
             settings.lockedWeatherThunder = tag.getBoolean("lockedWeatherThunder");
-            if (tag.contains("tamedMaidProtection")) settings.tamedMaidProtection = tag.getBoolean("tamedMaidProtection");
-            if (tag.contains("lastTamedMaidProtectionUse")) settings.lastTamedMaidProtectionUse = tag.getLong("lastTamedMaidProtectionUse");
-            if (tag.contains("entityCannotTarget")) settings.entityCannotTarget = tag.getBoolean("entityCannotTarget");
-            if (tag.contains("maidAuthority")) settings.maidAuthority = tag.getBoolean("maidAuthority");
-            if (tag.contains("maidAttackDiscard")) settings.maidAttackDiscard = tag.getBoolean("maidAttackDiscard");
-            if (tag.contains("dimensionType")) settings.dimensionType = Config.DimensionType.valueOf(tag.getString("dimensionType"));
+            if (tag.contains("tamedMaidProtection"))
+                settings.tamedMaidProtection = tag.getBoolean("tamedMaidProtection");
+            if (tag.contains("lastTamedMaidProtectionUse"))
+                settings.lastTamedMaidProtectionUse = tag.getLong("lastTamedMaidProtectionUse");
+            if (tag.contains("lastDomainExpansionUse"))
+                settings.lastDomainExpansionUse = tag.getLong("lastDomainExpansionUse");
+            if (tag.contains("entityCannotTarget"))
+                settings.entityCannotTarget = tag.getBoolean("entityCannotTarget");
+            if (tag.contains("maidAuthority"))
+                settings.maidAuthority = tag.getBoolean("maidAuthority");
+            if (tag.contains("maidAttackDiscard"))
+                settings.maidAttackDiscard = tag.getBoolean("maidAttackDiscard");
+            if (tag.contains("dimensionType"))
+                settings.dimensionType = Config.DimensionType.valueOf(tag.getString("dimensionType"));
+            // Domain expansion
+            if (tag.contains("domainExpansionUseDimensionRules"))
+                settings.domainExpansionUseDimensionRules = tag.getBoolean("domainExpansionUseDimensionRules");
+            else
+                settings.domainExpansionUseDimensionRules = true;
+            if (tag.contains("domainExpansionUseEntityProtection"))
+                settings.domainExpansionUseEntityProtection = tag.getBoolean("domainExpansionUseEntityProtection");
+            else
+                settings.domainExpansionUseEntityProtection = true;
+            if (tag.contains("domainExpansionCooldowns")) {
+                CompoundTag cdTag = tag.getCompound("domainExpansionCooldowns");
+                for (String key : cdTag.getAllKeys())
+                    settings.domainExpansionCooldowns.put(key, cdTag.getLong(key));
+            }
             return settings;
         }
 
         public CompoundTag save() {
             CompoundTag tag = new CompoundTag();
             ListTag allowedList = new ListTag();
-            for (String entity : allowedEntities) allowedList.add(StringTag.valueOf(entity));
+            for (String entity : allowedEntities)
+                allowedList.add(StringTag.valueOf(entity));
             tag.put("allowedEntities", allowedList);
             ListTag blockedList = new ListTag();
-            for (String entity : blockedEntities) blockedList.add(StringTag.valueOf(entity));
+            for (String entity : blockedEntities)
+                blockedList.add(StringTag.valueOf(entity));
             tag.put("blockedEntities", blockedList);
             tag.putBoolean("allowAllEntities", allowAllEntities);
             tag.putBoolean("disableHostileEntities", disableHostileEntities);
             ListTag allowedPlayersList = new ListTag();
-            for (String player : allowedPlayers) allowedPlayersList.add(StringTag.valueOf(player));
+            for (String player : allowedPlayers)
+                allowedPlayersList.add(StringTag.valueOf(player));
             tag.put("allowedPlayers", allowedPlayersList);
             tag.putBoolean("disableHunger", disableHunger);
             tag.putBoolean("disableMaidDeath", disableMaidDeath);
@@ -373,53 +412,215 @@ public class PersonalDimensionSavedData extends SavedData {
             tag.putBoolean("lockedWeatherThunder", lockedWeatherThunder);
             tag.putBoolean("tamedMaidProtection", tamedMaidProtection);
             tag.putLong("lastTamedMaidProtectionUse", lastTamedMaidProtectionUse);
+            tag.putLong("lastDomainExpansionUse", lastDomainExpansionUse);
             tag.putBoolean("entityCannotTarget", entityCannotTarget);
             tag.putBoolean("maidAuthority", maidAuthority);
             tag.putBoolean("maidAttackDiscard", maidAttackDiscard);
-            if (dimensionType != null) tag.putString("dimensionType", dimensionType.name());
+            if (dimensionType != null)
+                tag.putString("dimensionType", dimensionType.name());
+            // Domain expansion
+            tag.putBoolean("domainExpansionUseDimensionRules", domainExpansionUseDimensionRules);
+            tag.putBoolean("domainExpansionUseEntityProtection", domainExpansionUseEntityProtection);
+            CompoundTag cdTag = new CompoundTag();
+            for (Map.Entry<String, Long> e : domainExpansionCooldowns.entrySet())
+                cdTag.putLong(e.getKey(), e.getValue());
+            tag.put("domainExpansionCooldowns", cdTag);
             return tag;
         }
 
-        public Set<String> getAllowedEntities() { return allowedEntities; }
-        public Set<String> getBlockedEntities() { return blockedEntities; }
-        public boolean isAllowAllEntities() { return allowAllEntities; }
-        public void setAllowAllEntities(boolean allowAllEntities) { this.allowAllEntities = allowAllEntities; }
-        public boolean isDisableHostileEntities() { return disableHostileEntities; }
-        public void setDisableHostileEntities(boolean disableHostileEntities) { this.disableHostileEntities = disableHostileEntities; }
-        public Set<String> getAllowedPlayers() { return allowedPlayers; }
-        public boolean isDisableHunger() { return disableHunger; }
-        public void setDisableHunger(boolean disableHunger) { this.disableHunger = disableHunger; }
-        public boolean isDisableMaidDeath() { return disableMaidDeath; }
-        public void setDisableMaidDeath(boolean disableMaidDeath) { this.disableMaidDeath = disableMaidDeath; }
-        public boolean isDisablePlayerDeath() { return disablePlayerDeath; }
-        public void setDisablePlayerDeath(boolean disablePlayerDeath) { this.disablePlayerDeath = disablePlayerDeath; }
-        public boolean isNaturalHealing() { return naturalHealing; }
-        public void setNaturalHealing(boolean naturalHealing) { this.naturalHealing = naturalHealing; }
-        public boolean isBlockHarmfulEffects() { return blockHarmfulEffects; }
-        public void setBlockHarmfulEffects(boolean blockHarmfulEffects) { this.blockHarmfulEffects = blockHarmfulEffects; }
-        public boolean isMaidEmitLight() { return maidEmitLight; }
-        public void setMaidEmitLight(boolean maidEmitLight) { this.maidEmitLight = maidEmitLight; }
-        public boolean isLockDay() { return lockDay; }
-        public void setLockDay(boolean lockDay) { this.lockDay = lockDay; }
-        public int getLockedDayTime() { return lockedDayTime; }
-        public void setLockedDayTime(int lockedDayTime) { this.lockedDayTime = lockedDayTime; }
-        public boolean isLockWeather() { return lockWeather; }
-        public void setLockWeather(boolean lockWeather) { this.lockWeather = lockWeather; }
-        public boolean isLockedWeatherRain() { return lockedWeatherRain; }
-        public void setLockedWeatherRain(boolean lockedWeatherRain) { this.lockedWeatherRain = lockedWeatherRain; }
-        public boolean isLockedWeatherThunder() { return lockedWeatherThunder; }
-        public void setLockedWeatherThunder(boolean lockedWeatherThunder) { this.lockedWeatherThunder = lockedWeatherThunder; }
-        public boolean isTamedMaidProtection() { return tamedMaidProtection; }
-        public void setTamedMaidProtection(boolean tamedMaidProtection) { this.tamedMaidProtection = tamedMaidProtection; }
-        public long getLastTamedMaidProtectionUse() { return lastTamedMaidProtectionUse; }
-        public void setLastTamedMaidProtectionUse(long lastTamedMaidProtectionUse) { this.lastTamedMaidProtectionUse = lastTamedMaidProtectionUse; }
-        public boolean isEntityCannotTarget() { return entityCannotTarget; }
-        public void setEntityCannotTarget(boolean entityCannotTarget) { this.entityCannotTarget = entityCannotTarget; }
-        public boolean isMaidAuthority() { return maidAuthority; }
-        public void setMaidAuthority(boolean maidAuthority) { this.maidAuthority = maidAuthority; }
-        public boolean isMaidAttackDiscard() { return maidAttackDiscard; }
-        public void setMaidAttackDiscard(boolean maidAttackDiscard) { this.maidAttackDiscard = maidAttackDiscard; }
-        public Config.DimensionType getDimensionType() { return dimensionType; }
-        public void setDimensionType(Config.DimensionType dimensionType) { this.dimensionType = dimensionType; }
+        public Set<String> getAllowedEntities() {
+            return allowedEntities;
+        }
+
+        public Set<String> getBlockedEntities() {
+            return blockedEntities;
+        }
+
+        public boolean isAllowAllEntities() {
+            return allowAllEntities;
+        }
+
+        public void setAllowAllEntities(boolean allowAllEntities) {
+            this.allowAllEntities = allowAllEntities;
+        }
+
+        public boolean isDisableHostileEntities() {
+            return disableHostileEntities;
+        }
+
+        public void setDisableHostileEntities(boolean disableHostileEntities) {
+            this.disableHostileEntities = disableHostileEntities;
+        }
+
+        public Set<String> getAllowedPlayers() {
+            return allowedPlayers;
+        }
+
+        public boolean isDisableHunger() {
+            return disableHunger;
+        }
+
+        public void setDisableHunger(boolean disableHunger) {
+            this.disableHunger = disableHunger;
+        }
+
+        public boolean isDisableMaidDeath() {
+            return disableMaidDeath;
+        }
+
+        public void setDisableMaidDeath(boolean disableMaidDeath) {
+            this.disableMaidDeath = disableMaidDeath;
+        }
+
+        public boolean isDisablePlayerDeath() {
+            return disablePlayerDeath;
+        }
+
+        public void setDisablePlayerDeath(boolean disablePlayerDeath) {
+            this.disablePlayerDeath = disablePlayerDeath;
+        }
+
+        public boolean isNaturalHealing() {
+            return naturalHealing;
+        }
+
+        public void setNaturalHealing(boolean naturalHealing) {
+            this.naturalHealing = naturalHealing;
+        }
+
+        public boolean isBlockHarmfulEffects() {
+            return blockHarmfulEffects;
+        }
+
+        public void setBlockHarmfulEffects(boolean blockHarmfulEffects) {
+            this.blockHarmfulEffects = blockHarmfulEffects;
+        }
+
+        public boolean isMaidEmitLight() {
+            return maidEmitLight;
+        }
+
+        public void setMaidEmitLight(boolean maidEmitLight) {
+            this.maidEmitLight = maidEmitLight;
+        }
+
+        public boolean isLockDay() {
+            return lockDay;
+        }
+
+        public void setLockDay(boolean lockDay) {
+            this.lockDay = lockDay;
+        }
+
+        public int getLockedDayTime() {
+            return lockedDayTime;
+        }
+
+        public void setLockedDayTime(int lockedDayTime) {
+            this.lockedDayTime = lockedDayTime;
+        }
+
+        public boolean isLockWeather() {
+            return lockWeather;
+        }
+
+        public void setLockWeather(boolean lockWeather) {
+            this.lockWeather = lockWeather;
+        }
+
+        public boolean isLockedWeatherRain() {
+            return lockedWeatherRain;
+        }
+
+        public void setLockedWeatherRain(boolean lockedWeatherRain) {
+            this.lockedWeatherRain = lockedWeatherRain;
+        }
+
+        public boolean isLockedWeatherThunder() {
+            return lockedWeatherThunder;
+        }
+
+        public void setLockedWeatherThunder(boolean lockedWeatherThunder) {
+            this.lockedWeatherThunder = lockedWeatherThunder;
+        }
+
+        public boolean isTamedMaidProtection() {
+            return tamedMaidProtection;
+        }
+
+        public void setTamedMaidProtection(boolean tamedMaidProtection) {
+            this.tamedMaidProtection = tamedMaidProtection;
+        }
+
+        public long getLastTamedMaidProtectionUse() {
+            return lastTamedMaidProtectionUse;
+        }
+
+        public void setLastTamedMaidProtectionUse(long lastTamedMaidProtectionUse) {
+            this.lastTamedMaidProtectionUse = lastTamedMaidProtectionUse;
+        }
+
+        public long getLastDomainExpansionUse() {
+            return lastDomainExpansionUse;
+        }
+
+        public void setLastDomainExpansionUse(long lastDomainExpansionUse) {
+            this.lastDomainExpansionUse = lastDomainExpansionUse;
+        }
+
+
+
+
+        public boolean isEntityCannotTarget() {
+            return entityCannotTarget;
+        }
+
+        public void setEntityCannotTarget(boolean entityCannotTarget) {
+            this.entityCannotTarget = entityCannotTarget;
+        }
+
+        public boolean isMaidAuthority() {
+            return maidAuthority;
+        }
+
+        public void setMaidAuthority(boolean maidAuthority) {
+            this.maidAuthority = maidAuthority;
+        }
+
+        public boolean isMaidAttackDiscard() {
+            return maidAttackDiscard;
+        }
+
+        public void setMaidAttackDiscard(boolean maidAttackDiscard) {
+            this.maidAttackDiscard = maidAttackDiscard;
+        }
+
+        public Config.DimensionType getDimensionType() {
+            return dimensionType;
+        }
+
+        public void setDimensionType(Config.DimensionType dimensionType) {
+            this.dimensionType = dimensionType;
+        }
+
+        public boolean isDomainExpansionUseDimensionRules() {
+            return domainExpansionUseDimensionRules;
+        }
+
+        public void setDomainExpansionUseDimensionRules(boolean v) {
+            this.domainExpansionUseDimensionRules = v;
+        }
+
+        public boolean isDomainExpansionUseEntityProtection() {
+            return domainExpansionUseEntityProtection;
+        }
+
+        public void setDomainExpansionUseEntityProtection(boolean v) {
+            this.domainExpansionUseEntityProtection = v;
+        }
+
+        public Map<String, Long> getDomainExpansionCooldowns() {
+            return domainExpansionCooldowns;
+        }
     }
 }
