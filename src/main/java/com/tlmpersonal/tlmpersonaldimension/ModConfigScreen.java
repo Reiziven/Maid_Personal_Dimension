@@ -42,7 +42,7 @@ public class ModConfigScreen {
         general.addEntry(entryBuilder.startIntField(
                 Component.literal("Maid Spawn Chance"),
                 Config.MAID_SPAWN_CHANCE.get())
-                .setDefaultValue(50)
+                .setDefaultValue(100)
                 .setMin(0)
                 .setMax(1000)
                 .setTooltip(Component.literal("the bigger the number the smaller the chance for a maid to spawn naturally"))
@@ -134,7 +134,7 @@ public class ModConfigScreen {
                 .setSaveConsumer(Config.ENTITY_WHITELIST_MODE::set)
                 .build());
         entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Allowed Entities"), new ArrayList<>(Config.ALLOWED_ENTITIES.get()))
-                .setDefaultValue(List.of("minecraft:player", "minecraft:item", "minecraft:experience_orb"))
+                .setDefaultValue(List.of("touhou_little_maid:broom"))
                 .setSaveConsumer(Config.ALLOWED_ENTITIES::set)
                 .build());
         entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Blocked Entities"), new ArrayList<>(Config.BLOCKED_ENTITIES.get()))

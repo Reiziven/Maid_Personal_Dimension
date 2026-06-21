@@ -117,7 +117,7 @@ public class Config {
                 ENABLE_STRUCTURES = BUILDER.define("enableStructures", true);
                 MAID_SPAWN_CHANCE = BUILDER
                                 .comment("Rare chance per chunk for a maid to spawn naturally in OVERWORLD or CHERRY dimensions (1 in x chunks). Set to 0 to disable.")
-                                .defineInRange("maidSpawnChance", 50, 0, 1000);
+                                .defineInRange("maidSpawnChance", 100, 0, 1000);
                 TELEPORT_TO_GROUND = BUILDER.define("teleportToGround", true);
                 ALLOW_SET_SPAWN = BUILDER.define("allowSetSpawn", false);
                 ENABLE_BLOCK_BREAKING = BUILDER.define("enableBlockBreaking", true);
@@ -146,7 +146,7 @@ public class Config {
                                 .define("disableHostileEntities", false);
                 ENTITY_WHITELIST_MODE = BUILDER.define("entityWhitelistMode", true);
                 ALLOWED_ENTITIES = BUILDER.defineList("allowedEntities",
-                                () -> List.of("minecraft:player", "minecraft:item", "minecraft:experience_orb"),
+                                () -> List.of("touhou_little_maid:broom"),
                                 o -> o instanceof String);
                 BLOCKED_ENTITIES = BUILDER.defineList("blockedEntities", ArrayList::new, o -> o instanceof String);
                 BUILDER.pop();
