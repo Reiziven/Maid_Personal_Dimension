@@ -295,6 +295,27 @@ public class Touhoulittlemaidpersonaldimension {
         }
         return !Config.PRIVATE_DIMENSION.get() || finalOwnerId == null;
     }
+    /**
+     * Check if an entity ID matches any pattern in the list (supports wildcards like "minecraft:*")
+     */
+    private static boolean matchesAnyPattern(String entityId, java.util.Collection<? extends String> patterns) {
+        for (String pattern : patterns) {
+            // Direct match
+            if (pattern.equals(entityId)) {
+                return true;
+            }
+            // Wildcard match (e.g., "minecraft:*")
+            if (pattern.endsWith(":*")) {
+                String namespace = pattern.substring(0, pattern.length() - 2);
+                if (entityId.startsWith(namespace + ":")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
 
     public static void saveEntityPosition(Entity entity, ResourceKey<Level> dimension) {
         UUID uuid = entity.getUUID();
@@ -413,13 +434,13 @@ public class Touhoulittlemaidpersonaldimension {
                 settings = PersonalDimensionSavedData.get(level).getOrCreateSettings(finalOwnerId);
         }
         if (settings != null) {
-            if (settings.getBlockedEntities().contains(idString) || Config.BLOCKED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, settings.getBlockedEntities()) || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if ((settings.isDisableHostileEntities() || Config.DISABLE_HOSTILE_ENTITIES.get())
                     && entity.getType().getCategory() == MobCategory.MONSTER)
                 return false;
         } else {
-            if (Config.BLOCKED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if (Config.DISABLE_HOSTILE_ENTITIES.get() && entity.getType().getCategory() == MobCategory.MONSTER)
                 return false;
@@ -428,18 +449,18 @@ public class Touhoulittlemaidpersonaldimension {
                 || (entity.getType().getCategory() == MobCategory.MISC && !(entity instanceof LivingEntity)))
             return true;
         if (settings != null && (settings.isAllowAllEntities() || Config.ALLOW_ALL_ENTITIES.get()
-                || settings.getAllowedEntities().contains(idString)
-                || Config.ALLOWED_ENTITIES.get().contains(idString)))
+                || matchesAnyPattern(idString, settings.getAllowedEntities())
+                || matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get())))
             return true;
         if (Config.PRIVATE_DIMENSION.get()) {
             if (settings == null)
                 return false;
             return settings.isAllowAllEntities() || Config.ALLOW_ALL_ENTITIES.get()
-                    || settings.getAllowedEntities().contains(idString)
-                    || Config.ALLOWED_ENTITIES.get().contains(idString);
+                    || matchesAnyPattern(idString, settings.getAllowedEntities())
+                    || matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get());
         }
         if (Config.ENTITY_WHITELIST_MODE.get()) {
-            if (Config.ALLOWED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get()))
                 return true;
             return Config.ALLOW_ALL_ENTITIES.get();
         }
@@ -462,13 +483,13 @@ public class Touhoulittlemaidpersonaldimension {
                 settings = PersonalDimensionSavedData.get(level).getOrCreateSettings(finalOwnerId);
         }
         if (settings != null) {
-            if (settings.getBlockedEntities().contains(idString) || Config.BLOCKED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, settings.getBlockedEntities()) || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if ((settings.isDisableHostileEntities() || Config.DISABLE_HOSTILE_ENTITIES.get())
                     && entityType.getCategory() == MobCategory.MONSTER)
                 return false;
         } else {
-            if (Config.BLOCKED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if (Config.DISABLE_HOSTILE_ENTITIES.get() && entityType.getCategory() == MobCategory.MONSTER)
                 return false;
@@ -485,18 +506,18 @@ public class Touhoulittlemaidpersonaldimension {
                 || idString.equals("minecraft:trident"))
             return true;
         if (settings != null && (settings.isAllowAllEntities() || Config.ALLOW_ALL_ENTITIES.get()
-                || settings.getAllowedEntities().contains(idString)
-                || Config.ALLOWED_ENTITIES.get().contains(idString)))
+                || matchesAnyPattern(idString, settings.getAllowedEntities())
+                || matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get())))
             return true;
         if (Config.PRIVATE_DIMENSION.get()) {
             if (settings == null)
                 return false;
             return settings.isAllowAllEntities() || Config.ALLOW_ALL_ENTITIES.get()
-                    || settings.getAllowedEntities().contains(idString)
-                    || Config.ALLOWED_ENTITIES.get().contains(idString);
+                    || matchesAnyPattern(idString, settings.getAllowedEntities())
+                    || matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get());
         }
         if (Config.ENTITY_WHITELIST_MODE.get()) {
-            if (Config.ALLOWED_ENTITIES.get().contains(idString))
+            if (matchesAnyPattern(idString, Config.ALLOWED_ENTITIES.get()))
                 return true;
             return Config.ALLOW_ALL_ENTITIES.get();
         }
@@ -1112,9 +1133,11 @@ public class Touhoulittlemaidpersonaldimension {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
-        if ((isOurDimension(((Level) event.getLevel()).dimension())
-                || isUnderDimensionRules((Level) event.getLevel(), event.getPos()))
-                && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
+        if (isOurDimension(((Level) event.getLevel()).dimension()) && !Config.ENABLE_BLOCK_BREAKING.get()) {
+            event.setCanceled(true);
+            return;
+        }
+        if (isUnderDimensionRules((Level) event.getLevel(), event.getPos()) && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
             event.setCanceled(true);
             return;
         }
@@ -1133,9 +1156,11 @@ public class Touhoulittlemaidpersonaldimension {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if ((isOurDimension(((Level) event.getLevel()).dimension())
-                || isUnderDimensionRules((Level) event.getLevel(), event.getPos()))
-                && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
+        if (isOurDimension(((Level) event.getLevel()).dimension()) && !Config.ENABLE_BLOCK_BUILDING.get()) {
+            event.setCanceled(true);
+            return;
+        }
+        if (isUnderDimensionRules((Level) event.getLevel(), event.getPos()) && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
             event.setCanceled(true);
             return;
         }
@@ -1155,7 +1180,7 @@ public class Touhoulittlemaidpersonaldimension {
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onExplosionDetonate(ExplosionEvent.Detonate event) {
         Level level = event.getLevel();
-        if (isOurDimension(level.dimension()) && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
+        if (isOurDimension(level.dimension()) && !Config.ENABLE_BLOCK_BREAKING.get()) {
             event.getAffectedBlocks().clear();
             return;
         }

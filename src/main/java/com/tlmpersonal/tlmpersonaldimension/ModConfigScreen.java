@@ -134,11 +134,13 @@ public class ModConfigScreen {
                 .setSaveConsumer(Config.ENTITY_WHITELIST_MODE::set)
                 .build());
         entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Allowed Entities"), new ArrayList<>(Config.ALLOWED_ENTITIES.get()))
-                .setDefaultValue(List.of("touhou_little_maid:broom"))
+                .setDefaultValue(List.of("touhou_little_maid:broom","touhou_little_maid:chair"))
+                .setTooltip(Component.literal("Use entity IDs like 'minecraft:zombie' or wildcards like 'minecraft:*' to allow all entities from a mod."))
                 .setSaveConsumer(Config.ALLOWED_ENTITIES::set)
                 .build());
         entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Blocked Entities"), new ArrayList<>(Config.BLOCKED_ENTITIES.get()))
                 .setDefaultValue(List.of())
+                .setTooltip(Component.literal("Use entity IDs like 'minecraft:zombie' or wildcards like 'minecraft:*' to block all entities from a mod."))
                 .setSaveConsumer(Config.BLOCKED_ENTITIES::set)
                 .build());
 

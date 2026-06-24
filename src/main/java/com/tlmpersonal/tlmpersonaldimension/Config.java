@@ -146,7 +146,7 @@ public class Config {
                                 .define("disableHostileEntities", false);
                 ENTITY_WHITELIST_MODE = BUILDER.define("entityWhitelistMode", true);
                 ALLOWED_ENTITIES = BUILDER.defineList("allowedEntities",
-                                () -> List.of("touhou_little_maid:broom"),
+                                () -> List.of("touhou_little_maid:broom","touhou_little_maid:chair"),
                                 o -> o instanceof String);
                 BLOCKED_ENTITIES = BUILDER.defineList("blockedEntities", ArrayList::new, o -> o instanceof String);
                 BUILDER.pop();

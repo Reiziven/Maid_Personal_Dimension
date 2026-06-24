@@ -21,8 +21,8 @@ public class PersonalDimensionGui extends Screen {
     private static final Component TITLE = Component.translatable("gui.tlmpersonaldimension.title");
     private static final int GUI_WIDTH = 320;
     
-    private EditBox allowedEntityInput;
-    private EditBox blockedEntityInput;
+    private EntityIdEditBox allowedEntityInput;
+    private EntityIdEditBox blockedEntityInput;
     private EditBox allowedPlayerInput;
     private EditBox dayTimeInputWidget;
     private EntityListWidget allowedEntityListWidget;
@@ -94,7 +94,7 @@ public class PersonalDimensionGui extends Screen {
 
         int y = 40;
         
-        allowedEntityInput = new EditBox(this.font, centerX + 10, y + 12, 110, 18, Component.empty());
+        allowedEntityInput = new EntityIdEditBox(this.font, centerX + 10, y + 12, 110, 18, Component.empty());
         allowedEntityInput.setSuggestion("entity ID Whitelist");
         addScrollingWidget(allowedEntityInput);
 
@@ -102,7 +102,7 @@ public class PersonalDimensionGui extends Screen {
                 .bounds(centerX + 120, y + 12, 35, 18)
                 .build());
 
-        blockedEntityInput = new EditBox(this.font, centerX + 165, y + 12, 110, 18, Component.empty());
+        blockedEntityInput = new EntityIdEditBox(this.font, centerX + 165, y + 12, 110, 18, Component.empty());
         blockedEntityInput.setSuggestion("Entity ID blacklist");
         addScrollingWidget(blockedEntityInput);
 
