@@ -48,8 +48,15 @@ public class DomainExpansionEntity extends Entity {
     private final Map<BlockPos, BlockState> savedBlocks = new HashMap<>();
     private final Map<BlockPos, CompoundTag> savedBlockEntities = new HashMap<>();
     private final Map<UUID, Vec3> savedEntityPositions = new HashMap<>();
+    // UUIDs of entities spawned by the structure itself, to be discarded on restore
+    private final java.util.Set<UUID> structureEntities = new java.util.HashSet<>();
+    // UUIDs of item/XP entities that existed before the domain was summoned — must
+    // be preserved
+    private final java.util.Set<UUID> preExistingItems = new java.util.HashSet<>();
     private boolean initialized = false;
     private final int RADIUS = 64;
+    // Bounding box of the placed structure, used for effect range checks
+    private net.minecraft.world.phys.AABB structureAABB = null;
 
     public DomainExpansionEntity(EntityType<?> entityType, Level level) {
         super(entityType, level);
@@ -101,6 +108,18 @@ public class DomainExpansionEntity extends Entity {
                 }
             }
         }
+        if (compound.contains("StructureEntities")) {
+            ListTag list = compound.getList("StructureEntities", 11);
+            for (int i = 0; i < list.size(); i++) {
+                structureEntities.add(NbtUtils.loadUUID(list.get(i)));
+            }
+        }
+        if (compound.contains("PreExistingItems")) {
+            ListTag list = compound.getList("PreExistingItems", 11);
+            for (int i = 0; i < list.size(); i++) {
+                preExistingItems.add(NbtUtils.loadUUID(list.get(i)));
+            }
+        }
     }
 
     @Override
@@ -123,6 +142,18 @@ public class DomainExpansionEntity extends Entity {
             blockList.add(tag);
         }
         compound.put("SavedBlocks", blockList);
+
+        ListTag structureEntityList = new ListTag();
+        for (UUID uuid : structureEntities) {
+            structureEntityList.add(NbtUtils.createUUID(uuid));
+        }
+        compound.put("StructureEntities", structureEntityList);
+
+        ListTag preExistingItemList = new ListTag();
+        for (UUID uuid : preExistingItems) {
+            preExistingItemList.add(NbtUtils.createUUID(uuid));
+        }
+        compound.put("PreExistingItems", preExistingItemList);
     }
 
     @Override
@@ -146,20 +177,98 @@ public class DomainExpansionEntity extends Entity {
             return;
         }
         this.entityData.set(TICK_COUNT_REMAINING, remaining - 1);
-
-        // On first tick, remove any item or experience orb entities to prevent drops
-        if (remaining == Config.DOMAIN_EXPANSION_DURATION_SECONDS.get() * 20) {
-            for (Entity e : serverLevel.getEntities(this, this.getBoundingBox().inflate(RADIUS))) {
-                String name = e.getClass().getSimpleName();
-                if (name.equalsIgnoreCase("ItemEntity") || name.equalsIgnoreCase("ExperienceOrb")) {
-                    e.discard();
+        
+        boolean canSustain = true;
+        if (Config.DOMAIN_EXPANSION_XP_COST_ENABLED.get() && getOwnerId() != null) {
+            Player owner = serverLevel.getServer().getPlayerList().getPlayer(getOwnerId());
+            if (owner != null) {
+                int cost = Config.DOMAIN_EXPANSION_XP_COST.get();
+                if (cost > 0) {
+                    int intervalTicks = Config.DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS.get() * 20;
+                    if (owner.experienceLevel < cost) {
+                        canSustain = false;
+                    } else if (remaining % intervalTicks == 0) {
+                        owner.giveExperienceLevels(-cost);
+                    }
                 }
+            } else {
+                canSustain = false;
             }
+        }
+        
+        if (!canSustain) {
+            restoreDomain();
+            this.discard();
+            return;
         }
 
         if (remaining % 20 == 0 && isUsingEntityProtection()) {
             applyEffects();
         }
+
+        // Apply maid light independently of entity protection
+        if (remaining % 20 == 0) {
+            applyMaidLight(serverLevel);
+        }
+
+        // Continuously track new item/XP drops inside the domain so they survive
+        // restore
+        if (structureAABB != null) {
+            for (Entity e : serverLevel.getEntities(this, structureAABB)) {
+                if (e instanceof net.minecraft.world.entity.item.ItemEntity
+                        || e instanceof net.minecraft.world.entity.ExperienceOrb) {
+                    preExistingItems.add(e.getUUID());
+                }
+            }
+        }
+    }
+
+    private void applyMaidLight(ServerLevel serverLevel) {
+        UUID ownerId = getOwnerId();
+        if (ownerId == null)
+            return;
+        PersonalDimensionSavedData savedData = PersonalDimensionSavedData
+                .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
+        PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(ownerId);
+
+        net.minecraft.world.phys.AABB searchAABB = structureAABB != null ? structureAABB
+                : this.getBoundingBox().inflate(RADIUS);
+        java.util.Set<UUID> maidsInRange = new java.util.HashSet<>();
+
+        if (settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get()) {
+            for (Entity e : serverLevel.getEntities(this, searchAABB)) {
+                if (!(e instanceof EntityMaid maid))
+                    continue;
+                maidsInRange.add(maid.getUUID());
+                BlockPos newLightPos = maid.blockPosition().above();
+                BlockPos lastLightPos = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
+                BlockState atNew = serverLevel.getBlockState(newLightPos);
+                if (atNew.isAir() || atNew.is(Blocks.LIGHT)) {
+                    serverLevel.setBlockAndUpdate(newLightPos, Blocks.LIGHT.defaultBlockState());
+                    Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
+                }
+                if (lastLightPos != null && !lastLightPos.equals(newLightPos)
+                        && serverLevel.getBlockState(lastLightPos).is(Blocks.LIGHT)) {
+                    serverLevel.setBlockAndUpdate(lastLightPos, Blocks.AIR.defaultBlockState());
+                }
+            }
+        }
+
+        // Clean up lights for maids no longer in range or when setting is off
+        Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
+            if (!maidsInRange.contains(entry.getKey())) {
+                BlockPos lp = entry.getValue();
+                if (serverLevel.getBlockState(lp).is(Blocks.LIGHT)) {
+                    serverLevel.setBlockAndUpdate(lp, Blocks.AIR.defaultBlockState());
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    public net.minecraft.world.phys.AABB getStructureAABB() {
+        return structureAABB;
     }
 
     public boolean isUsingDimensionRules() {
@@ -197,145 +306,243 @@ public class DomainExpansionEntity extends Entity {
                 .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
         PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(ownerId);
 
-        for (Entity e : serverLevel.getEntities(this, this.getBoundingBox().inflate(RADIUS))) {
-            double dist = e.position().distanceTo(this.position());
-            if (dist <= RADIUS) {
-                if (!Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
-                    // Remove entity if config enabled; otherwise teleport outside the domain
-                    if (Config.REMOVE_BLOCKED_ENTITIES.get() && !(e instanceof Player) && !(e instanceof EntityMaid)) {
-                        e.discard();
-                    } else {
-                        // Teleport to a point just beyond the domain radius
-                        double angle = serverLevel.random.nextDouble() * 2 * Math.PI;
-                        double distance = RADIUS + 5.0;
-                        double targetX = this.getX() + Math.cos(angle) * distance;
-                        double targetZ = this.getZ() + Math.sin(angle) * distance;
-                        double targetY = e.getY();
-                        e.teleportTo(targetX, targetY, targetZ);
-                    }
+        net.minecraft.world.phys.AABB effectAABB = structureAABB != null ? structureAABB
+                : this.getBoundingBox().inflate(RADIUS);
+
+        for (Entity e : serverLevel.getEntities(this, effectAABB)) {
+            if (!effectAABB.contains(e.position()))
+                continue;
+            if (!Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
+                // Remove entity if config enabled; otherwise teleport outside the domain
+                if (Config.REMOVE_BLOCKED_ENTITIES.get() && !(e instanceof Player) && !(e instanceof EntityMaid)) {
+                    e.discard();
                 } else {
-                    // Apply each survival option independently (same logic as the personal dimension tick)
-                    if (e instanceof Player player && (settings.isDisableHunger() || Config.DISABLE_HUNGER.get())) {
-                        player.getFoodData().setFoodLevel(20);
+                    // Teleport to a point just beyond the domain radius
+                    double angle = serverLevel.random.nextDouble() * 2 * Math.PI;
+                    double distance = RADIUS + 5.0;
+                    double targetX = this.getX() + Math.cos(angle) * distance;
+                    double targetZ = this.getZ() + Math.sin(angle) * distance;
+                    int safeY = Touhoulittlemaidpersonaldimension.findSafeSurfaceY(serverLevel, (int) targetX, (int) targetZ);
+                    if (safeY > serverLevel.getMinBuildHeight()) {
+                        e.teleportTo(targetX, safeY, targetZ);
+                    } else {
+                        e.teleportTo(targetX, e.getY(), targetZ);
                     }
-                    if (e instanceof LivingEntity living
-                            && (settings.isNaturalHealing() || Config.NATURAL_HEALING.get())
-                            && living.getHealth() < living.getMaxHealth()) {
-                        living.heal(1.0f);
-                    }
-                    if (e instanceof EntityMaid maid
-                            && (settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get())) {
-                        BlockPos p = maid.blockPosition();
-                        if (serverLevel.getBlockState(p).isAir()) {
-                            serverLevel.setBlockAndUpdate(p, Blocks.LIGHT.defaultBlockState());
+                }
+            } else {
+                // Apply each survival option independently (same logic as the personal
+                // dimension tick)
+                if (e instanceof Player player && (settings.isDisableHunger() || Config.DISABLE_HUNGER.get())) {
+                    player.getFoodData().setFoodLevel(20);
+                }
+                if (e instanceof LivingEntity living
+                        && (settings.isNaturalHealing() || Config.NATURAL_HEALING.get())
+                        && living.getHealth() < living.getMaxHealth()) {
+                    living.heal(1.0f);
+                }
+                // Apply combat buffs/debuffs only when entity protection is enabled
+                if (isUsingEntityProtection()) {
+                    if (e instanceof Player player) {
+                        if (player.getUUID().equals(ownerId)) {
+                            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), false, false, true));
+                            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), false, false, true));
+                            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), false, false, true));
+                        } else {
+                            player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
+                            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
                         }
-                    }
-                    // Apply combat buffs/debuffs only when entity protection is enabled
-                    if (isUsingEntityProtection()) {
-                        // Apply buffs to owner and maid, debuffs to others
-                        if (e instanceof Player player) {
-                            if (player.getUUID().equals(ownerId)) {
-                                // Owner buffs: Strength III, Regeneration II, Resistance III
-                                player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40, 2, false, false, true));
-                                player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40, 1, false, false, true));
-                                player.addEffect(
-                                        new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40, 2, false, false, true));
-                            } else {
-                                // Non-allied player debuffs: Weakness II, Slowness X
-                                player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40, 1, false, false, true));
-                                player.addEffect(
-                                        new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 9, false, false, true));
-                            }
-                        } else if (e instanceof EntityMaid maid) {
-                            // Maid buffs: Strength III, Regeneration II, Resistance III
-                            maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40, 2, false, false, true));
-                            maid.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40, 1, false, false, true));
-                            maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40, 2, false, false, true));
-                        } else if (e instanceof LivingEntity living) {
-                            // Non-allied entity debuffs
-                            living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40, 1, false, false, true));
-                            living.addEffect(
-                                    new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 9, false, false, true));
-                        }
+                    } else if (e instanceof EntityMaid maid) {
+                        maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40,
+                                Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), false, false, true));
+                        maid.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40,
+                                Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), false, false, true));
+                        maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40,
+                                Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), false, false, true));
+                    } else if (e instanceof LivingEntity living) {
+                        living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
+                                Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
+                        living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
+                                Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
                     }
                 }
             }
         }
     }
 
-
+    private static boolean willDropItems(BlockState state) {
+        if (state.isAir()) return false;
+        return !state.isCollisionShapeFullBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO)
+                || state.is(net.minecraft.tags.BlockTags.CROPS)
+                || state.is(net.minecraft.tags.BlockTags.SAPLINGS)
+                || state.is(net.minecraft.tags.BlockTags.FLOWERS)
+                || state.getBlock() instanceof net.minecraft.world.level.block.BushBlock
+                || state.getBlock() instanceof net.minecraft.world.level.block.SugarCaneBlock;
+    }
 
     private void initializeDomain() {
         ServerLevel serverLevel = (ServerLevel) this.level();
         BlockPos center = this.blockPosition();
 
-        // Save entity positions before modifications
+        // Save entity positions before modifications, and snapshot pre-existing items
         for (Entity e : serverLevel.getEntities(this, this.getBoundingBox().inflate(RADIUS))) {
             savedEntityPositions.put(e.getUUID(), e.position());
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity
+                    || e instanceof net.minecraft.world.entity.ExperienceOrb) {
+                preExistingItems.add(e.getUUID());
+            }
         }
 
-        // Save blocks
-        for (int y = RADIUS; y >= -RADIUS; y--) {
-            for (int x = -RADIUS; x <= RADIUS; x++) {
-                for (int z = -RADIUS; z <= RADIUS; z++) {
-                    double distSq = x * x + y * y + z * z;
-                    if (distSq <= RADIUS * RADIUS) {
-                        BlockPos p = center.offset(x, y, z);
+        // Place structure and save only the blocks it will overwrite
+        StructureTemplateManager templateManager = serverLevel.getServer().getStructureManager();
+        Optional<StructureTemplate> templateOpt = templateManager
+                .get(ResourceLocation.fromNamespaceAndPath(Touhoulittlemaidpersonaldimension.MODID,
+                        Config.DOMAIN_EXPANSION_STRUCTURE.get()));
+        if (templateOpt.isPresent()) {
+            StructureTemplate template = templateOpt.get();
+            BlockPos structurePos = center.offset(-template.getSize().getX() / 2, 0,
+                    -template.getSize().getZ() / 2);
+
+            // Save ALL blocks within the structure's footprint before placing (including
+            // air, so positions overwritten by the structure's own air blocks are also restored)
+            net.minecraft.core.Vec3i size = template.getSize();
+            for (int y = 0; y < size.getY(); y++) {
+                for (int x = 0; x < size.getX(); x++) {
+                    for (int z = 0; z < size.getZ(); z++) {
+                        BlockPos p = structurePos.offset(x, y, z);
                         BlockState state = serverLevel.getBlockState(p);
-                        if (!state.isAir()) {
-                            savedBlocks.put(p, state);
-                            BlockEntity be = serverLevel.getBlockEntity(p);
-                            if (be != null) {
-                                savedBlockEntities.put(p, be.saveWithFullMetadata(serverLevel.registryAccess()));
-                            }
-                            // Use flag 18 to avoid drops during structural replacements if possible, but 2
-                            // is fine since we go top down.
-                            serverLevel.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        savedBlocks.put(p, state);
+                        BlockEntity be = serverLevel.getBlockEntity(p);
+                        if (be != null) {
+                            savedBlockEntities.put(p, be.saveWithFullMetadata(serverLevel.registryAccess()));
                         }
                     }
                 }
             }
-        }
 
-        // Barrier blocks removed as per user request
+            // Also save the layer directly below the structure footprint — vanilla will
+            // convert farmland to dirt when a solid block is placed above it, and since
+            // those positions are outside the footprint DE wouldn't restore them otherwise.
+            for (int x = 0; x < size.getX(); x++) {
+                for (int z = 0; z < size.getZ(); z++) {
+                    BlockPos p = structurePos.offset(x, -1, z);
+                    if (!savedBlocks.containsKey(p)) {
+                        savedBlocks.put(p, serverLevel.getBlockState(p));
+                    }
+                }
+            }
 
-        // Removed solid floor generation as per user request
+            StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(false);
 
-        // Place structure
-        StructureTemplateManager templateManager = serverLevel.getServer().getStructureManager();
-        Optional<StructureTemplate> templateOpt = templateManager
-                .get(ResourceLocation.fromNamespaceAndPath(Touhoulittlemaidpersonaldimension.MODID, "my_island"));
-        if (templateOpt.isPresent()) {
-            StructureTemplate template = templateOpt.get();
-            BlockPos structurePos = center.offset(-template.getSize().getX() / 2, -template.getSize().getY() / 2,
-                    -template.getSize().getZ() / 2);
-            StructurePlaceSettings settings = new StructurePlaceSettings();
+            // Silently remove any blocks that would drop items when overwritten by the structure
+            // (crops, plants, etc.) — prevents duplicate items when the domain restores them.
+            for (int y = 0; y < size.getY(); y++) {
+                for (int x = 0; x < size.getX(); x++) {
+                    for (int z = 0; z < size.getZ(); z++) {
+                        BlockPos p = structurePos.offset(x, y, z);
+                        BlockState state = serverLevel.getBlockState(p);
+                        if (!state.isAir() && willDropItems(state)) {
+                            // Flag 4 = no drops, 2 = send to clients, 16 = no observer updates
+                            serverLevel.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 4 | 2 | 16);
+                        }
+                    }
+                }
+            }
+
             template.placeInWorld(serverLevel, structurePos, structurePos, settings, serverLevel.random, 3);
+
+            // Build AABB from structure footprint for effect range checks
+            structureAABB = new net.minecraft.world.phys.AABB(
+                    structurePos.getX(), structurePos.getY(), structurePos.getZ(),
+                    structurePos.getX() + size.getX(), structurePos.getY() + size.getY(),
+                    structurePos.getZ() + size.getZ());
+
+            // Only teleport entities to the ground for my_island structure
+            if (Config.DOMAIN_EXPANSION_STRUCTURE.get().equals("my_island")) {
+                // Teleport entities in the structure area down to the ground of the domain (25 blocks above structurePos Y)
+                double groundY = structurePos.getY() + 25.0 + 1.0;
+                for (Entity e : serverLevel.getEntities(this, structureAABB)) {
+                    if (e == this) continue;
+                    // Exclude technical entities
+                    if (e instanceof net.minecraft.world.entity.item.ItemEntity 
+                            || e instanceof net.minecraft.world.entity.ExperienceOrb
+                            || e instanceof net.minecraft.world.entity.projectile.Projectile
+                            || e instanceof net.minecraft.world.entity.decoration.Painting
+                            || e instanceof net.minecraft.world.entity.decoration.ItemFrame
+                            || BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString().equals("touhou_little_maid:chair")) {
+                        continue;
+                    }
+                    // Check for air at entity's feet and head to prevent suffocation
+                    BlockPos feetPos = new BlockPos((int)e.getX(), (int)groundY, (int)e.getZ());
+                    BlockPos headPos = feetPos.above();
+                    if (serverLevel.getBlockState(feetPos).isAir() && serverLevel.getBlockState(headPos).isAir()) {
+                        e.teleportTo(e.getX(), groundY, e.getZ());
+                    } else {
+                        // If not enough air, search upwards for a safe spot
+                        BlockPos.MutableBlockPos safePos = new BlockPos.MutableBlockPos((int)e.getX(), (int)groundY, (int)e.getZ());
+                        int maxSearch = 10;
+                        for (int i = 0; i < maxSearch; i++) {
+                            if (serverLevel.getBlockState(safePos).isAir() && serverLevel.getBlockState(safePos.above()).isAir()) {
+                                e.teleportTo(e.getX(), safePos.getY(), e.getZ());
+                                break;
+                            }
+                            safePos.move(0, 1, 0);
+                        }
+                    }
+                }
+            }
+
+            // Collect entities spawned by the structure (not present before placement)
+            for (Entity e : serverLevel.getEntities(this, structureAABB)) {
+                if (!savedEntityPositions.containsKey(e.getUUID()) && !(e instanceof Player) && e != this) {
+                    structureEntities.add(e.getUUID());
+                }
+            }
         }
     }
 
     private void restoreDomain() {
         ServerLevel serverLevel = (ServerLevel) this.level();
-        BlockPos center = this.blockPosition();
 
-        // Clear everything inside
-        for (int y = RADIUS; y >= -RADIUS; y--) {
-            for (int x = -RADIUS; x <= RADIUS; x++) {
-                for (int z = -RADIUS; z <= RADIUS; z++) {
-                    double distSq = x * x + y * y + z * z;
-                    if (distSq <= RADIUS * RADIUS) {
-                        BlockPos p = center.offset(x, y, z);
-                        serverLevel.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
-                    }
+        // Discard all entities that were spawned by the structure
+        for (UUID uuid : structureEntities) {
+            Entity e = serverLevel.getEntity(uuid);
+            if (e != null)
+                e.discard();
+        }
+        // Also sweep the structure footprint for any item drops or leftover entities,
+        // but preserve items that existed before the domain was summoned
+        if (structureAABB != null) {
+            for (Entity e : serverLevel.getEntities(this, structureAABB)) {
+                if ((e instanceof net.minecraft.world.entity.item.ItemEntity
+                        || e instanceof net.minecraft.world.entity.ExperienceOrb)
+                        && !preExistingItems.contains(e.getUUID())) {
+                    e.discard();
                 }
             }
         }
 
-        // Restore saved blocks
+        // Clear only the blocks that were saved (structure footprint) before restoring.
+        // Must go top-down so dependent blocks (petals, grass, etc.) are removed before
+        // their support blocks, preventing physics-triggered item drops.
+        List<BlockPos> clearOrder = new ArrayList<>(savedBlocks.keySet());
+        clearOrder.sort((a, b) -> Integer.compare(b.getY(), a.getY())); // highest Y first
+        for (BlockPos p : clearOrder) {
+            // Flag 4 = no drops, 2 = send to clients, 16 = no observer updates (suppress
+            // cascades)
+            serverLevel.setBlock(p, Blocks.AIR.defaultBlockState(), 4 | 2 | 16);
+        }
+
+        // Restore saved blocks (bottom-up so support blocks exist before dependent
+        // ones)
         List<Map.Entry<BlockPos, BlockState>> sortedEntries = new ArrayList<>(savedBlocks.entrySet());
         sortedEntries.sort(Comparator.comparingInt(e -> e.getKey().getY()));
         for (Map.Entry<BlockPos, BlockState> entry : sortedEntries) {
-            serverLevel.setBlock(entry.getKey(), entry.getValue(), 3);
+            serverLevel.setBlock(entry.getKey(), entry.getValue(), 4 | 2 | 16);
             if (savedBlockEntities.containsKey(entry.getKey())) {
                 BlockEntity be = serverLevel.getBlockEntity(entry.getKey());
                 if (be != null) {

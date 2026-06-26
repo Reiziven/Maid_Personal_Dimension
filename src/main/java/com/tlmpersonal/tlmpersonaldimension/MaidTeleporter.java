@@ -162,6 +162,12 @@ public class MaidTeleporter extends Item {
                 setOwnerInfo(stack, ownerUUID, serverPlayer.getGameProfile().getName());
             }
 
+            // Check maid teleporter entity restrictions first
+            if (!Touhoulittlemaidpersonaldimension.isMaidTeleporterAllowed(target)) {
+                serverPlayer.sendSystemMessage(Component.literal("This entity cannot be teleported with the maid teleporter!"));
+                return InteractionResult.FAIL;
+            }
+
             boolean isJoining = !Touhoulittlemaidpersonaldimension.isOurDimension(target.level().dimension());
             if (!checkCooldown(serverPlayer, isJoining)) {
                 return InteractionResult.FAIL;

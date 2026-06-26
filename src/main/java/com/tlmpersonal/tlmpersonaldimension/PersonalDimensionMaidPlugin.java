@@ -11,5 +11,6 @@ public class PersonalDimensionMaidPlugin implements ILittleMaid {
     public void bindMaidBauble(BaubleManager manager) {
         manager.bind(Touhoulittlemaidpersonaldimension.DOMAIN_EXPANSION_BAUBLE, new DomainExpansionBauble());
         manager.bind(Touhoulittlemaidpersonaldimension.CHERRY_DOMAIN_BAUBLE, new com.tlmpersonal.tlmpersonaldimension.item.CherryDomainBauble());
+        manager.bind(Touhoulittlemaidpersonaldimension.CAT_FAMILIAR_BAUBLE, new com.tlmpersonal.tlmpersonaldimension.item.CatFamiliarBauble());
     }
 }

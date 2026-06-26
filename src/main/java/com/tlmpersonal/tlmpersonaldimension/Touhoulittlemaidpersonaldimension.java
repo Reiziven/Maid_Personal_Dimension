@@ -34,6 +34,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.neoforged.neoforge.common.Tags;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -79,10 +81,21 @@ public class Touhoulittlemaidpersonaldimension {
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE,
             MODID);
+    public static final DeferredRegister<net.minecraft.world.effect.MobEffect> MOB_EFFECTS = DeferredRegister
+            .create(Registries.MOB_EFFECT, MODID);
+    public static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.conditions.ICondition>> CONDITIONS = DeferredRegister
+            .create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.CONDITION_CODECS, MODID);
+
+    public static final net.neoforged.neoforge.registries.DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.conditions.ICondition>, com.mojang.serialization.MapCodec<com.tlmpersonal.tlmpersonaldimension.condition.BaubleCraftableCondition>> BAUBLE_CRAFTABLE_CONDITION = CONDITIONS
+            .register("bauble_craftable",
+                    () -> com.tlmpersonal.tlmpersonaldimension.condition.BaubleCraftableCondition.CODEC);
 
     private static final Map<ResourceKey<Level>, ConcurrentLinkedQueue<BlockPos>> PLACEMENT_QUEUE = new HashMap<>();
     private static final Map<ResourceKey<Level>, Set<ChunkPos>> PROCESSED_CHUNKS = new HashMap<>();
     private static final Map<ResourceKey<Level>, List<BlockPos>> GENERATED_ISLANDS = new HashMap<>();
+    // Tracks the last block pos where each maid placed a light block, keyed by maid
+    // UUID
+    public static final Map<UUID, BlockPos> MAID_LIGHT_POSITIONS = new HashMap<>();
 
     public static final ResourceKey<Level> PERSONAL_DIMENSION_VOID_KEY = ResourceKey.create(Registries.DIMENSION,
             ResourceLocation.fromNamespaceAndPath(MODID, "personal_dimension"));
@@ -112,16 +125,27 @@ public class Touhoulittlemaidpersonaldimension {
         ServerLevel level = (ServerLevel) entity.level();
         for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : level.getEntitiesOfClass(
                 com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
-                entity.getBoundingBox().inflate(32))) {
-            if (domain.isUsingDimensionRules() && entity.position().distanceToSqr(domain.position()) <= 32 * 32) {
-                return true;
+                entity.getBoundingBox().inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+                if (aabb != null ? aabb.contains(entity.position())
+                        : entity.position().distanceToSqr(domain.position()) <= 32 * 32) {
+                    return true;
+                }
             }
         }
         for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : level.getEntitiesOfClass(
                 com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
-                entity.getBoundingBox().inflate(10))) {
-            if (domain.isUsingDimensionRules() && entity.position().distanceToSqr(domain.position()) <= 25) {
-                return true;
+                entity.getBoundingBox().inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                double dx = entity.getX() - domain.getX();
+                double dy = entity.getY() - domain.getY();
+                double dz = entity.getZ() - domain.getZ();
+                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                    return true;
+                }
             }
         }
         return false;
@@ -131,15 +155,26 @@ public class Touhoulittlemaidpersonaldimension {
         if (level.isClientSide || !(level instanceof ServerLevel serverLevel))
             return false;
         for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : serverLevel.getEntitiesOfClass(
-                com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class, new AABB(pos).inflate(32))) {
-            if (domain.isUsingDimensionRules() && pos.distSqr(domain.blockPosition()) <= 32 * 32) {
-                return true;
+                com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class, new AABB(pos).inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+                if (aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
+                        : pos.distSqr(domain.blockPosition()) <= 32 * 32) {
+                    return true;
+                }
             }
         }
         for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : serverLevel.getEntitiesOfClass(
-                com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class, new AABB(pos).inflate(10))) {
-            if (domain.isUsingDimensionRules() && pos.distSqr(domain.blockPosition()) <= 25) {
-                return true;
+                com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class, new AABB(pos).inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                int dx = pos.getX() - domain.blockPosition().getX();
+                int dy = pos.getY() - domain.blockPosition().getY();
+                int dz = pos.getZ() - domain.blockPosition().getZ();
+                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                    return true;
+                }
             }
         }
         return false;
@@ -198,13 +233,35 @@ public class Touhoulittlemaidpersonaldimension {
                             .clientTrackingRange(20)
                             .build("cherry_domain"));
 
+    public static final DeferredHolder<EntityType<?>, EntityType<com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity>> CAT_FAMILIAR_ENTITY = ENTITY_TYPES
+            .register("cat_familiar",
+                    () -> EntityType.Builder.<com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity>of(
+                            com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity::new, MobCategory.CREATURE)
+                            .sized(0.6f, 0.7f)
+                            .clientTrackingRange(20)
+                            .build("cat_familiar"));
+
+    public static final DeferredHolder<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect> CAT_REFLEXES_EFFECT = MOB_EFFECTS
+            .register("cat_reflexes", com.tlmpersonal.tlmpersonaldimension.effect.CatReflexesEffect::new);
+
+    public static final DeferredHolder<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect> FELINE_GRACE_EFFECT = MOB_EFFECTS
+            .register("feline_grace", com.tlmpersonal.tlmpersonaldimension.effect.FelineGraceEffect::new);
+
+    public static final DeferredHolder<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect> BAD_LUCK_EFFECT = MOB_EFFECTS
+            .register("bad_luck", com.tlmpersonal.tlmpersonaldimension.effect.BadLuckEffect::new);
+
     public static final DeferredItem<MaidTeleporter> MAID_TELEPORTER = ITEMS.register("maid_teleporter",
             () -> new MaidTeleporter(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<Item> TAB_ICON = ITEMS.register("tab_icon", () -> new Item(new Item.Properties()));
     public static final DeferredItem<Item> DOMAIN_EXPANSION_BAUBLE = ITEMS.register("domain_expansion_bauble",
-            () -> new Item(new Item.Properties().stacksTo(1)));
+            () -> new com.tlmpersonal.tlmpersonaldimension.item.DomainExpansionBaubleItem(
+                    new Item.Properties().stacksTo(1)));
     public static final DeferredItem<Item> CHERRY_DOMAIN_BAUBLE = ITEMS.register("cherry_domain_bauble",
-            () -> new Item(new Item.Properties().stacksTo(1)));
+            () -> new com.tlmpersonal.tlmpersonaldimension.item.CherryDomainBaubleItem(
+                    new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> CAT_FAMILIAR_BAUBLE = ITEMS.register("cat_familiar_bauble",
+            () -> new com.tlmpersonal.tlmpersonaldimension.item.CatFamiliarBaubleItem(
+                    new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> PERSONAL_DIMENSION_TAB = CREATIVE_MODE_TABS
             .register("personal_dimension_tab", () -> CreativeModeTab.builder()
@@ -214,6 +271,7 @@ public class Touhoulittlemaidpersonaldimension {
                         output.accept(MAID_TELEPORTER.get());
                         output.accept(DOMAIN_EXPANSION_BAUBLE.get());
                         output.accept(CHERRY_DOMAIN_BAUBLE.get());
+                        output.accept(CAT_FAMILIAR_BAUBLE.get());
                     }).build());
 
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalDimensionMenu>> PERSONAL_DIMENSION_MENU = MENUS
@@ -223,11 +281,14 @@ public class Touhoulittlemaidpersonaldimension {
     public Touhoulittlemaidpersonaldimension(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
+        modEventBus.addListener(this::registerEntityAttributes);
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         MENUS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
+        MOB_EFFECTS.register(modEventBus);
+        CONDITIONS.register(modEventBus);
         NeoForge.EVENT_BUS.register(this);
         modEventBus.addListener(this::addCreative);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -252,6 +313,11 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
+    }
+
+    private void registerEntityAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {
+        event.put(CAT_FAMILIAR_ENTITY.get(),
+                com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity.createAttributes().build());
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -295,8 +361,10 @@ public class Touhoulittlemaidpersonaldimension {
         }
         return !Config.PRIVATE_DIMENSION.get() || finalOwnerId == null;
     }
+
     /**
-     * Check if an entity ID matches any pattern in the list (supports wildcards like "minecraft:*")
+     * Check if an entity ID matches any pattern in the list (supports wildcards
+     * like "minecraft:*")
      */
     private static boolean matchesAnyPattern(String entityId, java.util.Collection<? extends String> patterns) {
         for (String pattern : patterns) {
@@ -314,8 +382,6 @@ public class Touhoulittlemaidpersonaldimension {
         }
         return false;
     }
-
-
 
     public static void saveEntityPosition(Entity entity, ResourceKey<Level> dimension) {
         UUID uuid = entity.getUUID();
@@ -379,7 +445,7 @@ public class Touhoulittlemaidpersonaldimension {
         com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domainEntity = DOMAIN_EXPANSION_ENTITY.get()
                 .create(level);
         if (domainEntity != null) {
-            domainEntity.moveTo(maid.getX(), maid.getY(), maid.getZ(), 0, 0);
+            domainEntity.moveTo(maid.getX(), maid.getY() - 1, maid.getZ(), 0, 0);
             domainEntity.setMaidId(maid.getUUID());
             if (maid.getOwnerUUID() != null) {
                 domainEntity.setOwnerId(maid.getOwnerUUID());
@@ -393,24 +459,44 @@ public class Touhoulittlemaidpersonaldimension {
             return;
         ServerLevel level = (ServerLevel) maid.level();
 
+        boolean canSustain = true;
+        if (Config.CHERRY_DOMAIN_XP_COST_ENABLED.get() && maid.getOwnerUUID() != null) {
+            net.minecraft.world.entity.player.Player owner = level.getServer().getPlayerList().getPlayer(maid.getOwnerUUID());
+            if (owner != null) {
+                int cost = Config.CHERRY_DOMAIN_XP_COST.get();
+                if (cost > 0) {
+                    int intervalTicks = Config.CHERRY_DOMAIN_XP_COST_INTERVAL_SECONDS.get() * 20;
+                    if (owner.experienceLevel < cost) {
+                        canSustain = false;
+                    } else if (maid.tickCount % intervalTicks == 0) {
+                        owner.giveExperienceLevels(-cost);
+                    }
+                }
+            } else {
+                canSustain = false;
+            }
+        }
+
         // Check if the maid already has a Cherry Domain aura
         Optional<com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity> existing = level
                 .getEntitiesOfClass(com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
                         maid.getBoundingBox().inflate(10))
                 .stream().filter(d -> maid.getUUID().equals(d.getMaidId())).findFirst();
 
-        if (existing.isPresent()) {
-            existing.get().resetTimeout();
-        } else {
-            com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domainEntity = CHERRY_DOMAIN_ENTITY.get()
-                    .create(level);
-            if (domainEntity != null) {
-                domainEntity.moveTo(maid.getX(), maid.getY(), maid.getZ(), 0, 0);
-                domainEntity.setMaidId(maid.getUUID());
-                if (maid.getOwnerUUID() != null) {
-                    domainEntity.setOwnerId(maid.getOwnerUUID());
+        if (canSustain) {
+            if (existing.isPresent()) {
+                existing.get().resetTimeout();
+            } else {
+                com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domainEntity = CHERRY_DOMAIN_ENTITY.get()
+                        .create(level);
+                if (domainEntity != null) {
+                    domainEntity.moveTo(maid.getX(), maid.getY(), maid.getZ(), 0, 0);
+                    domainEntity.setMaidId(maid.getUUID());
+                    if (maid.getOwnerUUID() != null) {
+                        domainEntity.setOwnerId(maid.getOwnerUUID());
+                    }
+                    level.addFreshEntity(domainEntity);
                 }
-                level.addFreshEntity(domainEntity);
             }
         }
     }
@@ -423,6 +509,8 @@ public class Touhoulittlemaidpersonaldimension {
         String idString = entityId.toString();
         if (idString.equals("touhou_little_maid:maid"))
             return true;
+        if (idString.equals("touhou_little_maid:chair"))
+            return true;
         if (settings == null) {
             UUID finalOwnerId = ownerId;
             if (finalOwnerId == null && level != null) {
@@ -434,7 +522,8 @@ public class Touhoulittlemaidpersonaldimension {
                 settings = PersonalDimensionSavedData.get(level).getOrCreateSettings(finalOwnerId);
         }
         if (settings != null) {
-            if (matchesAnyPattern(idString, settings.getBlockedEntities()) || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
+            if (matchesAnyPattern(idString, settings.getBlockedEntities())
+                    || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if ((settings.isDisableHostileEntities() || Config.DISABLE_HOSTILE_ENTITIES.get())
                     && entity.getType().getCategory() == MobCategory.MONSTER)
@@ -475,6 +564,8 @@ public class Touhoulittlemaidpersonaldimension {
         String idString = entityId.toString();
         if (idString.equals("touhou_little_maid:maid"))
             return true;
+        if (idString.equals("touhou_little_maid:chair"))
+            return true;
         if (settings == null) {
             UUID finalOwnerId = ownerId;
             if (finalOwnerId == null && level != null)
@@ -483,7 +574,8 @@ public class Touhoulittlemaidpersonaldimension {
                 settings = PersonalDimensionSavedData.get(level).getOrCreateSettings(finalOwnerId);
         }
         if (settings != null) {
-            if (matchesAnyPattern(idString, settings.getBlockedEntities()) || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
+            if (matchesAnyPattern(idString, settings.getBlockedEntities())
+                    || matchesAnyPattern(idString, Config.BLOCKED_ENTITIES.get()))
                 return false;
             if ((settings.isDisableHostileEntities() || Config.DISABLE_HOSTILE_ENTITIES.get())
                     && entityType.getCategory() == MobCategory.MONSTER)
@@ -524,6 +616,44 @@ public class Touhoulittlemaidpersonaldimension {
         return Config.ALLOW_ALL_ENTITIES.get();
     }
 
+    public static boolean isBossEntity(Entity entity) {
+        if (entity == null) return false;
+        EntityType<?> entityType = entity.getType();
+        TagKey<EntityType<?>> bossesTag = Tags.EntityTypes.BOSSES; // #c:bosses
+        TagKey<EntityType<?>> neoforgeBossesTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("neoforge", "bosses"));
+        TagKey<EntityType<?>> forgeBossesTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("forge", "bosses"));
+        return entityType.is(bossesTag) || entityType.is(neoforgeBossesTag) || entityType.is(forgeBossesTag);
+    }
+
+    public static boolean isMaidTeleporterAllowed(Entity entity) {
+        if (entity == null) return false;
+        if (entity instanceof Player) return false; // Don't allow teleporting players with shift-right-click
+        
+        ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        String idString = entityId.toString();
+        
+        // Exclude bosses first if enabled
+        if (Config.MAID_TELEPORTER_EXCLUDE_BOSSES.get() && isBossEntity(entity)) {
+            return false;
+        }
+        
+        // Check blacklist first (higher priority)
+        if (matchesAnyPattern(idString, Config.MAID_TELEPORTER_BLOCKED_ENTITIES.get())) {
+            return false;
+        }
+        
+        // Check whitelist / allow all
+        if (Config.MAID_TELEPORTER_ALLOW_ALL_ENTITIES.get()) {
+            return true;
+        }
+        
+        if (Config.MAID_TELEPORTER_ENTITY_WHITELIST_MODE.get()) {
+            return matchesAnyPattern(idString, Config.MAID_TELEPORTER_ALLOWED_ENTITIES.get());
+        }
+        
+        return true;
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoinLevel(EntityJoinLevelEvent event) {
         Entity entity = event.getEntity();
@@ -534,6 +664,16 @@ public class Touhoulittlemaidpersonaldimension {
         UUID ownerId = getOwnerUUIDFromDimensionKey(serverLevel.dimension());
         if (ownerId == null)
             ownerId = getOwnerUUIDFromPosition(serverLevel, entity.getX(), entity.getZ());
+        // For overworld domains (domain expansion / cherry domain), resolve owner from
+        // the domain entity
+        if (ownerId == null) {
+            ownerId = getOwnerIdFromEntityAndLevel(entity, serverLevel);
+        }
+        if (ownerId == null) {
+            // No owner found means we're under a domain rule but can't identify owner —
+            // allow the entity
+            return;
+        }
         if (!isAllowed(entity, ownerId, serverLevel, null)) {
             event.setCanceled(true);
             entity.discard();
@@ -543,8 +683,7 @@ public class Touhoulittlemaidpersonaldimension {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onFinalizeSpawn(FinalizeSpawnEvent event) {
         Entity entity = event.getEntity();
-        if (entity.level().isClientSide()
-                || !(isOurDimension(entity.level().dimension()) || isUnderDimensionRules(entity)))
+        if (entity.level().isClientSide() || !isOurDimension(entity.level().dimension()))
             return;
         if (event.getSpawnType() == MobSpawnType.CONVERSION)
             return;
@@ -559,6 +698,8 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     public static void processRemoval(Entity entity) {
+        if (entity == null)
+            return;
         if (Config.REMOVE_BLOCKED_ENTITIES.get()) {
             if (entity instanceof ServerPlayer player) {
                 ServerLevel overworld = player.server.getLevel(Level.OVERWORLD);
@@ -580,6 +721,23 @@ public class Touhoulittlemaidpersonaldimension {
             return;
         }
         if (entity.level() instanceof ServerLevel serverLevel) {
+            if (!isOurDimension(serverLevel.dimension())) {
+                double angle = serverLevel.random.nextDouble() * 2 * Math.PI;
+                double distance = 30.0;
+                double targetX = entity.getX() + Math.cos(angle) * distance;
+                double targetZ = entity.getZ() + Math.sin(angle) * distance;
+                int safeY = findSafeSurfaceY(serverLevel, (int) targetX, (int) targetZ);
+                if (safeY > serverLevel.getMinBuildHeight()) {
+                    entity.teleportTo(targetX, safeY, targetZ);
+                } else {
+                    entity.teleportTo(targetX, entity.getY(), targetZ);
+                }
+                if (entity instanceof ServerPlayer player) {
+                    player.sendSystemMessage(Component.literal("You were expelled!"));
+                }
+                return;
+            }
+
             ServerLevel overworld = serverLevel.getServer().getLevel(Level.OVERWORLD);
             if (overworld != null) {
                 TeleportLocation savedPos = getEntityPosition(entity.getUUID(), Level.OVERWORLD);
@@ -775,6 +933,7 @@ public class Touhoulittlemaidpersonaldimension {
             PersonalDimensionSavedData.PlayerDimensionSettings settings = PersonalDimensionSavedData.get(serverLevel)
                     .getOrCreateSettings(ownerId);
             List<Entity> toRemove = new ArrayList<>();
+            Set<UUID> activeMaidUUIDs = new java.util.HashSet<>();
             for (Entity entity : serverLevel.getAllEntities()) {
                 if (!isAllowed(entity, ownerId, serverLevel, settings)) {
                     toRemove.add(entity);
@@ -789,11 +948,33 @@ public class Touhoulittlemaidpersonaldimension {
                         && living.getHealth() < living.getMaxHealth())
                     living.heal(1.0f);
                 if (entity instanceof EntityMaid maid && (settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get())) {
-                    BlockPos pos = maid.blockPosition();
-                    if (level.getBlockState(pos).isAir())
-                        level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.LIGHT.defaultBlockState());
+                    activeMaidUUIDs.add(maid.getUUID());
+                    BlockPos newLightPos = maid.blockPosition().above();
+                    BlockPos lastLightPos = MAID_LIGHT_POSITIONS.get(maid.getUUID());
+                    net.minecraft.world.level.block.state.BlockState atNew = level.getBlockState(newLightPos);
+                    if (atNew.isAir() || atNew.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+                        level.setBlockAndUpdate(newLightPos,
+                                net.minecraft.world.level.block.Blocks.LIGHT.defaultBlockState());
+                        MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
+                    }
+                    if (lastLightPos != null && !lastLightPos.equals(newLightPos)
+                            && level.getBlockState(lastLightPos).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+                        level.setBlockAndUpdate(lastLightPos,
+                                net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    }
                 }
             }
+            // Clean up lights for maids that are no longer in this dimension
+            MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
+                if (!activeMaidUUIDs.contains(entry.getKey())) {
+                    BlockPos lp = entry.getValue();
+                    if (level.getBlockState(lp).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+                        level.setBlockAndUpdate(lp, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    }
+                    return true;
+                }
+                return false;
+            });
             for (Entity entity : toRemove)
                 Touhoulittlemaidpersonaldimension.processRemoval(entity);
             if (Config.ALLOW_CHEAT_CONFIGS.get()) {
@@ -869,7 +1050,18 @@ public class Touhoulittlemaidpersonaldimension {
             for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : serverLevel
                     .getEntitiesOfClass(com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
                             entity.getBoundingBox().inflate(32))) {
-                if (domain.isUsingDimensionRules() && entity.position().distanceToSqr(domain.position()) <= 32 * 32) {
+                if (domain.isUsingDimensionRules()) {
+                    net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+                    if (aabb != null ? aabb.contains(entity.position())
+                            : entity.position().distanceToSqr(domain.position()) <= 32 * 32) {
+                        return domain.getOwnerId();
+                    }
+                }
+            }
+            for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : serverLevel
+                    .getEntitiesOfClass(com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
+                            entity.getBoundingBox().inflate(10))) {
+                if (domain.isUsingDimensionRules() && entity.position().distanceToSqr(domain.position()) <= 25) {
                     return domain.getOwnerId();
                 }
             }
@@ -889,6 +1081,123 @@ public class Touhoulittlemaidpersonaldimension {
                 ownerId = ownable.getOwnerUUID();
         }
         return ownerId;
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onCatReflexesDamage(LivingIncomingDamageEvent event) {
+        LivingEntity entity = event.getEntity();
+
+        // Check if entity has Cat Reflexes effect
+        if (!entity.hasEffect(CAT_REFLEXES_EFFECT))
+            return;
+
+        // Only reduce damage from entity attacks
+        if (!(event.getSource().getEntity() instanceof LivingEntity))
+            return;
+
+        // 20% chance to fully dodge the damage (no damage, no knockback)
+        if (entity.level().random.nextFloat() < 0.20f) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.NORMAL)
+    public void onMaidOrOwnerHurt(LivingIncomingDamageEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide)
+            return;
+        // Only care about entity attacks (not fall, fire, etc.)
+        if (!(event.getSource().getEntity() instanceof LivingEntity attacker))
+            return;
+
+        ServerLevel serverLevel = (ServerLevel) entity.level();
+
+        // If a maid is hurt, apply Cat Reflexes to it and look for a cat familiar
+        if (entity instanceof EntityMaid maid) {
+            for (com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity cat : serverLevel.getEntitiesOfClass(
+                    com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity.class,
+                    maid.getBoundingBox().inflate(32))) {
+                if (maid.getUUID().equals(cat.getMaidId())) {
+                    applyCatReflexesToEntity(maid);
+                    // Also apply to owner if nearby
+                    if (maid.getOwnerUUID() != null) {
+                        Player owner = serverLevel.getPlayerByUUID(maid.getOwnerUUID());
+                        if (owner != null && owner.distanceToSqr(maid) <= 32 * 32) {
+                            applyCatReflexesToEntity(owner);
+                        }
+                        // Apply Bad Luck to attacker if it's not the owner
+                        if (owner == null || !attacker.getUUID().equals(owner.getUUID())) {
+                            applyBadLuckToEntity(attacker);
+                        }
+                    } else {
+                        applyBadLuckToEntity(attacker);
+                    }
+                    break;
+                }
+            }
+        }
+        // If the owner player is hurt, apply Cat Reflexes to them and their maid
+        else if (entity instanceof Player player) {
+            for (com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity cat : serverLevel.getEntitiesOfClass(
+                    com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity.class,
+                    player.getBoundingBox().inflate(32))) {
+                UUID maidId = cat.getMaidId();
+                if (maidId == null)
+                    continue;
+                net.minecraft.world.entity.Entity maidEntity = serverLevel.getEntity(maidId);
+                if (!(maidEntity instanceof EntityMaid maid))
+                    continue;
+                if (player.getUUID().equals(maid.getOwnerUUID())) {
+                    applyCatReflexesToEntity(player);
+                    applyCatReflexesToEntity(maid);
+                    // Apply Bad Luck to attacker — it's definitely not the owner (it attacked the
+                    // owner)
+                    applyBadLuckToEntity(attacker);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void applyBadLuckToEntity(LivingEntity entity) {
+        if (!entity.hasEffect(BAD_LUCK_EFFECT)) {
+            entity.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                    BAD_LUCK_EFFECT, 1200, 0, false, true, true)); // 1 minute, visible particles + icon
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onBadLuckAttack(LivingIncomingDamageEvent event) {
+        if (event.getEntity().level().isClientSide)
+            return;
+        LivingEntity attacker = event.getSource().getEntity() instanceof LivingEntity l ? l : null;
+        if (attacker == null)
+            return;
+        if (attacker.hasEffect(BAD_LUCK_EFFECT)) {
+            if (attacker.level().random
+                    .nextFloat() < com.tlmpersonal.tlmpersonaldimension.effect.BadLuckEffect.MISS_CHANCE) {
+                event.setCanceled(true); // Attack misses
+            }
+        }
+    }
+
+    private void applyCatReflexesToEntity(LivingEntity entity) {
+        // Only apply if not already active, to prevent duration accumulation
+        if (!entity.hasEffect(CAT_REFLEXES_EFFECT)) {
+            entity.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                    CAT_REFLEXES_EFFECT, 1200, 0, false, false, false)); // exactly 1 minute, no particles
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onFelineGraceFall(net.neoforged.neoforge.event.entity.living.LivingFallEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide)
+            return;
+        if (entity.hasEffect(FELINE_GRACE_EFFECT)) {
+            event.setDamageMultiplier(event.getDamageMultiplier()
+                    * (1.0f - com.tlmpersonal.tlmpersonaldimension.effect.FelineGraceEffect.FALL_DAMAGE_REDUCTION));
+        }
     }
 
     @SubscribeEvent
@@ -922,13 +1231,11 @@ public class Touhoulittlemaidpersonaldimension {
             if (isTargetMaid && (settings.isDisableMaidDeath() || Config.DISABLE_MAID_DEATH.get())) {
                 event.setCanceled(true);
                 target.setHealth(1.0f);
-                Touhoulittlemaidpersonaldimension.processRemoval(attacker);
                 return;
             }
             if (isTargetOwner && (settings.isDisablePlayerDeath() || Config.DISABLE_PLAYER_DEATH.get())) {
                 event.setCanceled(true);
                 target.setHealth(1.0f);
-                Touhoulittlemaidpersonaldimension.processRemoval(attacker);
                 return;
             }
             if (Config.TAMED_MAID_PROTECTION_ENABLED.get()
@@ -1074,8 +1381,7 @@ public class Touhoulittlemaidpersonaldimension {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onSpawnPlacementCheck(MobSpawnEvent.SpawnPlacementCheck event) {
-        if (event.getLevel() instanceof ServerLevel level
-                && (isOurDimension(level.dimension()) || isUnderDimensionRules(level, event.getPos()))) {
+        if (event.getLevel() instanceof ServerLevel level && isOurDimension(level.dimension())) {
             BlockPos pos = event.getPos();
             UUID ownerId = getOwnerUUIDFromDimensionKey(level.dimension());
             if (ownerId == null)
@@ -1133,22 +1439,49 @@ public class Touhoulittlemaidpersonaldimension {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (isOurDimension(((Level) event.getLevel()).dimension()) && !Config.ENABLE_BLOCK_BREAKING.get()) {
+        Level level = (Level) event.getLevel();
+        BlockPos pos = event.getPos();
+
+        // Personal dimension block breaking
+        if (isOurDimension(level.dimension()) && !Config.ENABLE_BLOCK_BREAKING.get()) {
             event.setCanceled(true);
             return;
         }
-        if (isUnderDimensionRules((Level) event.getLevel(), event.getPos()) && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
-            event.setCanceled(true);
+
+        if (level.isClientSide || !(level instanceof ServerLevel serverLevel))
             return;
-        }
-        if (!event.getPlayer().level().isClientSide) {
-            ServerLevel level = (ServerLevel) event.getPlayer().level();
-            for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : level.getEntitiesOfClass(
-                    com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
-                    new AABB(event.getPos()).inflate(20))) {
-                if (event.getPos().distSqr(domain.blockPosition()) <= 20 * 20) {
+
+        // Domain Expansion block breaking
+        for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : serverLevel.getEntitiesOfClass(
+                com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
+                new AABB(pos).inflate(200))) {
+            net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+            boolean inDomain = aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
+                    : pos.distSqr(domain.blockPosition()) <= 32 * 32;
+            if (inDomain) {
+                boolean useDimRules = domain.isUsingDimensionRules();
+                if (useDimRules && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
                     event.setCanceled(true);
                     return;
+                }
+            }
+        }
+
+        // Cherry Domain block breaking
+        for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : serverLevel.getEntitiesOfClass(
+                com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
+                new AABB(pos).inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                int dx = pos.getX() - domain.blockPosition().getX();
+                int dy = pos.getY() - domain.blockPosition().getY();
+                int dz = pos.getZ() - domain.blockPosition().getZ();
+                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                    if (!Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get()) {
+                        event.setCanceled(true);
+                        return;
+                    }
                 }
             }
         }
@@ -1156,22 +1489,48 @@ public class Touhoulittlemaidpersonaldimension {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if (isOurDimension(((Level) event.getLevel()).dimension()) && !Config.ENABLE_BLOCK_BUILDING.get()) {
+        Level level = (Level) event.getLevel();
+        BlockPos pos = event.getPos();
+
+        // Personal dimension block building
+        if (isOurDimension(level.dimension()) && !Config.ENABLE_BLOCK_BUILDING.get()) {
             event.setCanceled(true);
             return;
         }
-        if (isUnderDimensionRules((Level) event.getLevel(), event.getPos()) && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
-            event.setCanceled(true);
+
+        if (level.isClientSide || !(level instanceof ServerLevel serverLevel))
             return;
-        }
-        if (event.getEntity() != null && !event.getEntity().level().isClientSide) {
-            ServerLevel level = (ServerLevel) event.getEntity().level();
-            for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : level.getEntitiesOfClass(
-                    com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
-                    new AABB(event.getPos()).inflate(20))) {
-                if (event.getPos().distSqr(domain.blockPosition()) <= 20 * 20) {
+
+        // Domain Expansion block building (shares block breaking config)
+        for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : serverLevel.getEntitiesOfClass(
+                com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
+                new AABB(pos).inflate(200))) {
+            net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+            boolean inDomain = aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
+                    : pos.distSqr(domain.blockPosition()) <= 32 * 32;
+            if (inDomain) {
+                if (domain.isUsingDimensionRules() && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
                     event.setCanceled(true);
                     return;
+                }
+            }
+        }
+
+        // Cherry Domain block building
+        for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : serverLevel.getEntitiesOfClass(
+                com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
+                new AABB(pos).inflate(200))) {
+            if (domain.isUsingDimensionRules()) {
+                int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                int dx = pos.getX() - domain.blockPosition().getX();
+                int dy = pos.getY() - domain.blockPosition().getY();
+                int dz = pos.getZ() - domain.blockPosition().getZ();
+                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                    if (!Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get()) {
+                        event.setCanceled(true);
+                        return;
+                    }
                 }
             }
         }
@@ -1184,18 +1543,32 @@ public class Touhoulittlemaidpersonaldimension {
             event.getAffectedBlocks().clear();
             return;
         }
-        if (!level.isClientSide && !Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get()) {
-            event.getAffectedBlocks().removeIf(pos -> isUnderDimensionRules(level, pos));
-        }
-        if (!level.isClientSide) {
-            List<BlockPos> affectedBlocks = event.getAffectedBlocks();
-            affectedBlocks.removeIf(pos -> {
-                for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : level
+        if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+            // Domain Expansion: remove blocks only when dimension rules are active and block breaking is off
+            event.getAffectedBlocks().removeIf(pos -> {
+                for (com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity domain : serverLevel
                         .getEntitiesOfClass(com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity.class,
-                                new AABB(pos).inflate(20))) {
-                    if (pos.distSqr(domain.blockPosition()) <= 20 * 20) {
+                                new AABB(pos).inflate(200))) {
+                    if (!domain.isUsingDimensionRules() || Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get())
+                        continue;
+                    net.minecraft.world.phys.AABB aabb = domain.getStructureAABB();
+                    boolean inDomain = aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
+                            : pos.distSqr(domain.blockPosition()) <= 32 * 32;
+                    if (inDomain) return true;
+                }
+                // Cherry Domain: remove blocks only when dimension rules are active and block breaking is off
+                for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : serverLevel
+                        .getEntitiesOfClass(com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity.class,
+                                new AABB(pos).inflate(200))) {
+                    if (!domain.isUsingDimensionRules() || Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get())
+                        continue;
+                    int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                    int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                    int dx = pos.getX() - domain.blockPosition().getX();
+                    int dy = pos.getY() - domain.blockPosition().getY();
+                    int dz = pos.getZ() - domain.blockPosition().getZ();
+                    if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius)
                         return true;
-                    }
                 }
                 return false;
             });

@@ -237,6 +237,13 @@ public class ModConfigScreen {
                 .setTooltip(Component.literal("Tamed maids will teleport with their owner through any dimension, regardless of distance."))
                 .setSaveConsumer(Config.MAID_TELEPORT_WITH_OWNER_DIMENSION::set)
                 .build());
+        maidProtection.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Maid Attack Discard"),
+                Config.MAID_ATTACK_DISCARD.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If ON, maids in the personal dimension will discard entities they attack or are hostile towards."))
+                .setSaveConsumer(Config.MAID_ATTACK_DISCARD::set)
+                .build());
 
         ConfigCategory survivalOptions = builder.getOrCreateCategory(Component.literal("Survival Options"));
         survivalOptions.addEntry(entryBuilder.startBooleanToggle(
@@ -411,6 +418,145 @@ public class ModConfigScreen {
                 .setDefaultValue(100)
                 .setMin(0)
                 .setSaveConsumer(Config.DIMENSION_RULES_COST_XP::set)
+                .build());
+
+        ConfigCategory domainExpansion = builder.getOrCreateCategory(Component.literal("Domain Expansion Bauble"));
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Domain Expansion Enabled"),
+                Config.DOMAIN_EXPANSION_ENABLED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, maids with the Domain Expansion bauble and favorability level 3 can activate domain expansions."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ENABLED::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Domain Expansion Cooldown (Seconds)"),
+                Config.DOMAIN_EXPANSION_COOLDOWN_SECONDS.get())
+                .setDefaultValue(300)
+                .setMin(0)
+                .setTooltip(Component.literal("Cooldown in seconds before a maid can activate a domain expansion again."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_COOLDOWN_SECONDS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Domain Expansion Duration (Seconds)"),
+                Config.DOMAIN_EXPANSION_DURATION_SECONDS.get())
+                .setDefaultValue(60)
+                .setMin(-1)
+                .setMax(3600)
+                .setTooltip(Component.literal("How long (in seconds) the domain expansion lasts before collapsing."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_DURATION_SECONDS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Use Dimension Rules"),
+                Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, domain expansions enforce dimension-like rules: maid authority, natural healing etc."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Use Entity Protection"),
+                Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, domain expansions apply combat effects: allies get buffs, enemies get debuffs."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain Affects Owner"),
+                Config.CHERRY_DOMAIN_AFFECTS_OWNER.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, the Cherry Domain Bauble also creates an aura around the owner."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_AFFECTS_OWNER::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Cherry Domain Rules Bypass Chance (%)"),
+                Config.CHERRY_DOMAIN_RULES_BYPASS_CHANCE.get(),
+                0, 100)
+                .setDefaultValue(30)
+                .setTooltip(Component.literal("Percent chance that Cherry Domain dimension rules are skipped each check. 20 = 20% chance rules won't apply."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_RULES_BYPASS_CHANCE::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Enable Block Breaking in Cherry Domain"),
+                Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If false, blocks cannot be broken inside a cherry domain."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startDoubleField(
+                Component.literal("Minimum Domain Distance"),
+                Config.DOMAIN_EXPANSION_MIN_DISTANCE.get())
+                .setDefaultValue(100.0)
+                .setMin(10.0)
+                .setMax(10000.0)
+                .setTooltip(Component.literal("Minimum distance between active domains to prevent overlapping."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_MIN_DISTANCE::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Enable Block Breaking in Domain"),
+                Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If false, blocks cannot be broken inside a domain expansion."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING::set)
+                .build());
+
+        ConfigCategory catFamiliar = builder.getOrCreateCategory(Component.literal("Cat Familiar Bauble"));
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Effect Application Cooldown"),
+                Config.CAT_FAMILIAR_EFFECT_COOLDOWN.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, cat familiar beneficial effects have a cooldown between applications."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_EFFECT_COOLDOWN::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Attacks Entities"),
+                Config.CAT_FAMILIAR_ATTACKS_ENTITIES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, cat familiar will attack entities that attack the maid."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_ATTACKS_ENTITIES::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Cat Revival Cooldown (seconds)"),
+                Config.CAT_FAMILIAR_REVIVAL_COOLDOWN.get(),
+                0, 1000000)
+                .setDefaultValue(600)
+                .setTooltip(Component.literal("Cooldown in seconds before a dead cat familiar can be revived (respawned) by the maid."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_REVIVAL_COOLDOWN::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Detects Hostile Mobs"),
+                Config.CAT_FAMILIAR_DETECT_HOSTILES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("Cat highlights hostile mobs within 128 blocks with Glowing for 30 seconds. Re-detects same mob after 1 minute."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_DETECT_HOSTILES::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Detection Chat Whisper"),
+                Config.CAT_FAMILIAR_DETECT_HOSTILES_CHAT.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, cat also sends a chat message with exact coordinates when a hostile is detected."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_DETECT_HOSTILES_CHAT::set)
+                .build());
+
+        ConfigCategory baubleCrafting = builder.getOrCreateCategory(Component.literal("Bauble Crafting"));
+        baubleCrafting.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Domain Expansion Bauble Craftable"),
+                Config.DOMAIN_EXPANSION_BAUBLE_CRAFTABLE.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If false, the Domain Expansion Bauble cannot be crafted at the altar. Still obtainable via commands."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_BAUBLE_CRAFTABLE::set)
+                .build());
+        baubleCrafting.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain Bauble Craftable"),
+                Config.CHERRY_DOMAIN_BAUBLE_CRAFTABLE.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If false, the Cherry Domain Bauble cannot be crafted at the altar. Still obtainable via commands."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_BAUBLE_CRAFTABLE::set)
+                .build());
+        baubleCrafting.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Familiar Bauble Craftable"),
+                Config.CAT_FAMILIAR_BAUBLE_CRAFTABLE.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If false, the Cat Familiar Bauble cannot be crafted at the altar. Still obtainable via commands."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_BAUBLE_CRAFTABLE::set)
                 .build());
 
         return builder.build();

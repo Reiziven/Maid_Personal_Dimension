@@ -22,6 +22,8 @@ public class TouhoulittlemaidpersonaldimensionClient {
     private void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(Touhoulittlemaidpersonaldimension.DOMAIN_EXPANSION_ENTITY.get(), NoopRenderer::new);
         event.registerEntityRenderer(Touhoulittlemaidpersonaldimension.CHERRY_DOMAIN_ENTITY.get(), NoopRenderer::new);
+        event.registerEntityRenderer(Touhoulittlemaidpersonaldimension.CAT_FAMILIAR_ENTITY.get(), 
+            net.minecraft.client.renderer.entity.CatRenderer::new);
     }
 
     public static void handleSettingsSync(CompoundTag settings, boolean allowCheats) {

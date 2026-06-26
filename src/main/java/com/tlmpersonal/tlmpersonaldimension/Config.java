@@ -64,6 +64,11 @@ public class Config {
 
         // Entity Teleportation with Items
         public static final ModConfigSpec.BooleanValue ALLOW_ENTITY_TELEPORT;
+        public static final ModConfigSpec.BooleanValue MAID_TELEPORTER_ALLOW_ALL_ENTITIES;
+        public static final ModConfigSpec.BooleanValue MAID_TELEPORTER_ENTITY_WHITELIST_MODE;
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> MAID_TELEPORTER_ALLOWED_ENTITIES;
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> MAID_TELEPORTER_BLOCKED_ENTITIES;
+        public static final ModConfigSpec.BooleanValue MAID_TELEPORTER_EXCLUDE_BOSSES;
 
         // General Survival Options
         public static final ModConfigSpec.BooleanValue DISABLE_HUNGER;
@@ -101,6 +106,11 @@ public class Config {
         // GUI Layout Options
         public static final ModConfigSpec.BooleanValue USE_MAID_GUI_CONTROLS;
 
+        // Bauble Crafting
+        public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_BAUBLE_CRAFTABLE;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_BAUBLE_CRAFTABLE;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_BAUBLE_CRAFTABLE;
+
         // Domain Expansion Bauble
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_ENABLED;
         public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_COOLDOWN_SECONDS;
@@ -108,8 +118,32 @@ public class Config {
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_USE_DIMENSION_RULES;
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_USE_ENTITY_PROTECTION;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_AFFECTS_OWNER;
+public static final ModConfigSpec.IntValue CHERRY_DOMAIN_HORIZONTAL_RADIUS;
+public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
+        public static final ModConfigSpec.IntValue CHERRY_DOMAIN_RULES_BYPASS_CHANCE;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_XP_COST_ENABLED;
+        public static final ModConfigSpec.IntValue CHERRY_DOMAIN_XP_COST;
+        public static final ModConfigSpec.IntValue CHERRY_DOMAIN_XP_COST_INTERVAL_SECONDS;
+        public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_XP_COST_ENABLED;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_XP_COST;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS;
         public static final ModConfigSpec.DoubleValue DOMAIN_EXPANSION_MIN_DISTANCE;
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING;
+        public static final ModConfigSpec.ConfigValue<String> DOMAIN_EXPANSION_STRUCTURE;
+        // Domain Expansion buff/debuff amplifiers (0 = level I, 1 = level II, etc.)
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_STRENGTH;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_REGEN;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_RESISTANCE;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_WEAKNESS;
+        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_SLOWNESS;
+
+        // Cat Familiar Bauble
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_EFFECT_COOLDOWN;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_ATTACKS_ENTITIES;
+        public static final ModConfigSpec.IntValue CAT_FAMILIAR_REVIVAL_COOLDOWN;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_DETECT_HOSTILES;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_DETECT_HOSTILES_CHAT;
 
         static {
                 BUILDER.push("General Settings");
@@ -203,6 +237,21 @@ public class Config {
                 ALLOW_ENTITY_TELEPORT = BUILDER
                                 .comment("If ON, players can teleport entities by shift-right-clicking them with Okina's door or maid teleporter.")
                                 .define("allowEntityTeleport", true);
+                MAID_TELEPORTER_ALLOW_ALL_ENTITIES = BUILDER
+                                .comment("If true, all entities are allowed to be teleported with maid teleporter (unless blacklisted or excluded as a boss).")
+                                .define("maidTeleporterAllowAllEntities", true);
+                MAID_TELEPORTER_ENTITY_WHITELIST_MODE = BUILDER
+                                .comment("If true, only entities in maid teleporter whitelist are allowed; if false, only entities in blacklist are blocked.")
+                                .define("maidTeleporterEntityWhitelistMode", true);
+                MAID_TELEPORTER_ALLOWED_ENTITIES = BUILDER
+                                .comment("List of entity IDs allowed to be teleported with maid teleporter (e.g., 'touhou_little_maid:entity_maid', 'minecraft:cow').")
+                                .defineList("maidTeleporterAllowedEntities", ArrayList::new, o -> true);
+                MAID_TELEPORTER_BLOCKED_ENTITIES = BUILDER
+                                .comment("List of entity IDs blocked from being teleported with maid teleporter (higher priority than whitelist).")
+                                .defineList("maidTeleporterBlockedEntities", ArrayList::new, o -> true);
+                MAID_TELEPORTER_EXCLUDE_BOSSES = BUILDER
+                                .comment("If true, entities tagged as bosses (e.g., #c:bosses, #neoforge:bosses) cannot be teleported with maid teleporter.")
+                                .define("maidTeleporterExcludeBosses", true);
                 BUILDER.pop();
 
                 BUILDER.push("General Survival Options");
@@ -298,6 +347,20 @@ public class Config {
                                 .define("useMaidGuiControls", false);
                 BUILDER.pop();
 
+                BUILDER.push("Bauble Configuration");
+
+                BUILDER.push("Bauble Crafting");
+                DOMAIN_EXPANSION_BAUBLE_CRAFTABLE = BUILDER
+                                .comment("If true, the Domain Expansion Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                                .define("domainExpansionBaubleCraftable", true);
+                CHERRY_DOMAIN_BAUBLE_CRAFTABLE = BUILDER
+                                .comment("If true, the Cherry Domain Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                                .define("cherryDomainBaubleCraftable", true);
+                CAT_FAMILIAR_BAUBLE_CRAFTABLE = BUILDER
+                                .comment("If true, the Cat Familiar Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                                .define("catFamiliarBaubleCraftable", true);
+                BUILDER.pop();
+
                 BUILDER.push("Domain Expansion Bauble");
                 DOMAIN_EXPANSION_ENABLED = BUILDER
                                 .comment("If true, maids with the Domain Expansion bauble and favorability level 3 can activate domain expansions.")
@@ -308,22 +371,90 @@ public class Config {
                 DOMAIN_EXPANSION_DURATION_SECONDS = BUILDER
                                 .comment("How long (in seconds) the domain expansion lasts before collapsing.")
                                 .defineInRange("domainExpansionDurationSeconds", 60, -1, 3600);
+                DOMAIN_EXPANSION_XP_COST_ENABLED = BUILDER
+                                .comment("If true, Domain Expansion consumes XP levels from its owner over time.")
+                                .define("domainExpansionXpCostEnabled", true);
+                DOMAIN_EXPANSION_XP_COST = BUILDER
+                                .comment("How many experience levels to consume per interval.")
+                                .defineInRange("domainExpansionXpCost", 1, 0, 100);
+                DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS = BUILDER
+                                .comment("How often (in seconds) the Domain Expansion consumes XP.")
+                                .defineInRange("domainExpansionXpCostIntervalSeconds", 10, 1, 3600);
                 DOMAIN_EXPANSION_USE_DIMENSION_RULES = BUILDER
-                                .comment("If true, domain expansions enforce dimension-like rules: no block breaking, unbreakable barrier walls. Can be overridden per-player via GUI.")
+                                .comment("If true, domain expansions enforce dimension-like rules: maid authority, natural healing etc. Can be overridden per-player via GUI.")
                                 .define("domainExpansionUseDimensionRules", true);
                 DOMAIN_EXPANSION_USE_ENTITY_PROTECTION = BUILDER
                                 .comment("If true, domain expansions apply combat effects: allies get buffs (Strength III, Regen II, Resistance III, Absorption IV), enemies get Weakness II and Slowness V. Can be overridden per-player via GUI.")
                                 .define("domainExpansionUseEntityProtection", true);
                 CHERRY_DOMAIN_AFFECTS_OWNER = BUILDER
-                                .comment("If true, the Cherry Domain Bauble also creates an aura around the owner.")
-                                .define("cherryDomainAffectsOwner", true);
+                        .comment("If true, the Cherry Domain Bauble also creates an aura around the owner.")
+                        .define("cherryDomainAffectsOwner", false);
+                CHERRY_DOMAIN_HORIZONTAL_RADIUS = BUILDER
+                        .comment("Horizontal radius for Cherry Domain block placement (half width). 2 gives a 5x5 area. NOTE tat high value can cause lag")
+                        .defineInRange("cherryDomainHorizontalRadius", 2, 0, 100);
+                CHERRY_DOMAIN_VERTICAL_HALF = BUILDER
+                        .comment("Vertical half-range for Cherry Domain (half of total height). 10 gives a 20 block tall area. NOTE tat high value can cause lag")
+                        .defineInRange("cherryDomainVerticalHalf", 10, 0, 256);
+                CHERRY_DOMAIN_RULES_BYPASS_CHANCE = BUILDER
+                        .comment("Percent chance (0-100) that Cherry Domain dimension rules are skipped on any given check. Default 20 means 20% chance rules won't apply.")
+                        .defineInRange("cherryDomainRulesBypassChance", 30, 0, 100);
+                CHERRY_DOMAIN_XP_COST_ENABLED = BUILDER
+                        .comment("If true, Cherry Domain consumes XP levels from its owner over time.")
+                        .define("cherryDomainXpCostEnabled", true);
+                CHERRY_DOMAIN_XP_COST = BUILDER
+                        .comment("How many experience levels to consume per interval.")
+                        .defineInRange("cherryDomainXpCost", 1, 0, 100);
+                CHERRY_DOMAIN_XP_COST_INTERVAL_SECONDS = BUILDER
+                        .comment("How often (in seconds) the Cherry Domain consumes XP. Default is 120 (2 minutes).")
+                        .defineInRange("cherryDomainXpCostIntervalSeconds", 120, 1, 3600);
                 DOMAIN_EXPANSION_MIN_DISTANCE = BUILDER
                                 .comment("Minimum distance between active domains to prevent overlapping.")
                                 .defineInRange("domainExpansionMinDistance", 100.0, 10.0, 10000.0);
                 DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING = BUILDER
                                 .comment("If false, blocks cannot be broken inside a domain expansion.")
                                 .define("domainExpansionEnableBlockBreaking", false);
+                CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING = BUILDER
+                                .comment("If false, blocks cannot be broken inside a cherry domain.")
+                                .define("cherryDomainEnableBlockBreaking", false);
+                DOMAIN_EXPANSION_STRUCTURE = BUILDER
+                                .comment("Which structure to use for Domain Expansion (\"domain_expansion\" or \"my_island\").")
+                                .define("domainExpansionStructure", "domain_expansion");
+                DOMAIN_EXPANSION_ALLY_STRENGTH = BUILDER
+                                .comment("Strength amplifier for allies inside domain expansion (0=I, 1=II, 2=III...).")
+                                .defineInRange("domainExpansionAllyStrength", 1, 0, 255);
+                DOMAIN_EXPANSION_ALLY_REGEN = BUILDER
+                                .comment("Regeneration amplifier for allies inside domain expansion (0=I, 1=II...).")
+                                .defineInRange("domainExpansionAllyRegen", 1, 0, 255);
+                DOMAIN_EXPANSION_ALLY_RESISTANCE = BUILDER
+                                .comment("Resistance amplifier for allies inside domain expansion (0=I, 1=II, 2=III...).")
+                                .defineInRange("domainExpansionAllyResistance", 1, 0, 255);
+                DOMAIN_EXPANSION_ENEMY_WEAKNESS = BUILDER
+                                .comment("Weakness amplifier for enemies inside domain expansion (0=I, 1=II...).")
+                                .defineInRange("domainExpansionEnemyWeakness", 0, 0, 255);
+                DOMAIN_EXPANSION_ENEMY_SLOWNESS = BUILDER
+                                .comment("Slowness amplifier for enemies inside domain expansion (0=I ... 9=X...).")
+                                .defineInRange("domainExpansionEnemySlowness", 0, 0, 255);
                 BUILDER.pop();
+
+                BUILDER.push("Cat Familiar Bauble");
+                CAT_FAMILIAR_EFFECT_COOLDOWN = BUILDER
+                                .comment("If true, cat familiar beneficial effects have a cooldown between applications.")
+                                .define("catFamiliarEffectCooldown", true);
+                CAT_FAMILIAR_ATTACKS_ENTITIES = BUILDER
+                                .comment("If true, cat familiar will attack entities that attack the maid.")
+                                .define("catFamiliarAttacksEntities", true);
+                CAT_FAMILIAR_REVIVAL_COOLDOWN = BUILDER
+                                .comment("Cooldown in seconds before a dead cat familiar can be revived (respawned) by the maid.")
+                                .defineInRange("catFamiliarRevivalCooldown", 600, 0, 1000000);
+                CAT_FAMILIAR_DETECT_HOSTILES = BUILDER
+                                .comment("If true, the cat familiar will detect hostile mobs within 128 blocks, apply Glowing for 30 seconds, and optionally whisper coordinates to the owner.")
+                                .define("catFamiliarDetectHostiles", false);
+                CAT_FAMILIAR_DETECT_HOSTILES_CHAT = BUILDER
+                                .comment("If true, the cat familiar will also send a chat whisper with coordinates when detecting a hostile mob. Requires catFamiliarDetectHostiles to be true.")
+                                .define("catFamiliarDetectHostilesChat", false);
+                BUILDER.pop();
+                
+                BUILDER.pop(); // End Bauble Configuration
         }
 
         public static final ModConfigSpec SPEC = BUILDER.build();
