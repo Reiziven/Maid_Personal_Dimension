@@ -401,7 +401,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .define("cherryDomainUseEntityProtection", false);
                 CHERRY_DOMAIN_USE_ENTITY_FILTERING = BUILDER
                                 .comment("If true, Cherry Domain enforces entity filtering: blocked entities are expelled or removed.")
-                                .define("cherryDomainUseEntityFiltering", true);
+                                .define("cherryDomainUseEntityFiltering", false);
                 CHERRY_DOMAIN_AFFECTS_OWNER = BUILDER
                         .comment("If true, the Cherry Domain Bauble also creates an aura around the owner.")
                         .define("cherryDomainAffectsOwner", false);
@@ -410,7 +410,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                         .defineInRange("cherryDomainHorizontalRadius", 10, 0, 100);
                 CHERRY_DOMAIN_VERTICAL_HALF = BUILDER
                         .comment("Vertical half-range for Cherry Domain (half of total height). 10 gives a 20 block tall area. NOTE tat high value can cause lag")
-                        .defineInRange("cherryDomainVerticalHalf", 20, 0, 256);
+                        .defineInRange("cherryDomainVerticalHalf", 15, 0, 256);
                 CHERRY_DOMAIN_RULES_BYPASS_CHANCE = BUILDER
                         .comment("Percent chance (0-100) that Cherry Domain dimension rules are skipped on any given check. Default 20 means 20% chance rules won't apply.")
                         .defineInRange("cherryDomainRulesBypassChance", 30, 0, 100);
@@ -431,7 +431,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .define("domainExpansionEnableBlockBreaking", false);
                 CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING = BUILDER
                                 .comment("If false, blocks cannot be broken inside a cherry domain.")
-                                .define("cherryDomainEnableBlockBreaking", false);
+                                .define("cherryDomainEnableBlockBreaking", true);
                 DOMAIN_EXPANSION_STRUCTURE = BUILDER
                                 .comment("Which structure to use for Domain Expansion (\"domain_expansion\" or \"my_island\").")
                                 .define("domainExpansionStructure", "domain_expansion");

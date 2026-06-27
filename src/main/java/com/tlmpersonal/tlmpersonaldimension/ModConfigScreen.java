@@ -104,7 +104,7 @@ public class ModConfigScreen {
                 Component.literal("YSM Model IDs"),
                 new ArrayList<>(Config.YSM_MODEL_IDS.get()))
                 .setDefaultValue(List.of("default"))
-                .setTooltip(Component.literal("List of YSM model IDs to randomly choose from"))
+                .setTooltip(Component.literal("List of YSM model IDs to randomly choose from List of YSM model IDs to randomly choose from (e.g., [\"default\", \"misc/1_alex\", \"misc/2_steve\"]). Use /ysm model set @s to find your model's location and ID!"))
                 .setSaveConsumer(Config.YSM_MODEL_IDS::set)
                 .build());
 
@@ -490,7 +490,7 @@ public class ModConfigScreen {
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Cherry Domain: Use Entity Filtering"),
                 Config.CHERRY_DOMAIN_USE_ENTITY_FILTERING.get())
-                .setDefaultValue(true)
+                .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, Cherry Domain expels or removes blocked entities."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_USE_ENTITY_FILTERING::set)
                 .build());
@@ -505,7 +505,7 @@ public class ModConfigScreen {
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Enable Block Breaking in Cherry Domain"),
                 Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get())
-                .setDefaultValue(false)
+                .setDefaultValue(true)
                 .setTooltip(Component.literal("If false, blocks cannot be broken inside a cherry domain."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING::set)
                 .build());

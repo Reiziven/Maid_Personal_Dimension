@@ -1037,14 +1037,14 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     /**
-     * Expels an entity 25 blocks away from (centerX, centerZ) at a random angle,
+     * Expels an entity 45 blocks away from (centerX, centerZ) at a random angle,
      * scanning upward from its current Y for a safe 2-air-block gap.
      * Applies Glowing for 10 seconds after teleport.
      */
     public static void expelFromDomain(Entity entity, ServerLevel level, double centerX, double centerZ) {
         double angle = level.random.nextDouble() * 2 * Math.PI;
-        double targetX = centerX + Math.cos(angle) * 25.0;
-        double targetZ = centerZ + Math.sin(angle) * 25.0;
+        double targetX = centerX + Math.cos(angle) * 45.0;
+        double targetZ = centerZ + Math.sin(angle) * 45.0;
 
         // Scan upward from entity's current Y for 2 consecutive air blocks
         int startY = (int) entity.getY();
