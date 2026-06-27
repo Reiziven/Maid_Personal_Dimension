@@ -30,6 +30,7 @@ public class PersonalDimensionSavedData extends SavedData {
     private static final String TAG_GLOBAL_LEAVE_COOLDOWNS = "global_leave_cooldowns";
     private static final String TAG_PLAYER_GRIDS = "player_grids";
     private static final String TAG_PRIVATE_DIMENSIONS = "private_dimensions";
+    private static final String TAG_ISLAND_PLACED_DIMS = "island_placed_dims";
 
     private final Map<UUID, PlayerDimensionSettings> playerSettings = new HashMap<>();
     private final Map<UUID, Long> teleporterCooldowns = new HashMap<>();
@@ -38,6 +39,7 @@ public class PersonalDimensionSavedData extends SavedData {
     private final Map<UUID, Pair<Integer, Integer>> playerGrids = new HashMap<>();
     private final Map<Pair<Integer, Integer>, UUID> gridToPlayer = new HashMap<>();
     private final Set<UUID> privateDimensions = new HashSet<>();
+    private final Set<ResourceKey<Level>> islandPlacedDimensions = new HashSet<>();
     // Track tamed maids: maid UUID -> (owner UUID, last level, last position)
     private final Map<UUID, MaidInfo> trackedMaids = new HashMap<>();
 
@@ -105,6 +107,7 @@ public class PersonalDimensionSavedData extends SavedData {
         gridToPlayer.clear();
         privateDimensions.clear();
         trackedMaids.clear();
+        islandPlacedDimensions.clear();
 
         if (tag.contains(TAG_PLAYERS)) {
             CompoundTag playersTag = tag.getCompound(TAG_PLAYERS);
@@ -157,6 +160,14 @@ public class PersonalDimensionSavedData extends SavedData {
             ListTag list = tag.getList(TAG_PRIVATE_DIMENSIONS, 8);
             for (int i = 0; i < list.size(); i++) {
                 privateDimensions.add(UUID.fromString(list.getString(i)));
+            }
+        }
+
+        if (tag.contains(TAG_ISLAND_PLACED_DIMS)) {
+            ListTag list = tag.getList(TAG_ISLAND_PLACED_DIMS, 8);
+            for (int i = 0; i < list.size(); i++) {
+                islandPlacedDimensions.add(ResourceKey.create(Registries.DIMENSION,
+                        ResourceLocation.parse(list.getString(i))));
             }
         }
 
@@ -216,6 +227,12 @@ public class PersonalDimensionSavedData extends SavedData {
             maidsTag.put(entry.getKey().toString(), entry.getValue().save());
         }
         tag.put("trackedMaids", maidsTag);
+
+        ListTag islandDimsList = new ListTag();
+        for (ResourceKey<Level> key : islandPlacedDimensions) {
+            islandDimsList.add(StringTag.valueOf(key.location().toString()));
+        }
+        tag.put(TAG_ISLAND_PLACED_DIMS, islandDimsList);
 
         return tag;
     }
@@ -283,6 +300,14 @@ public class PersonalDimensionSavedData extends SavedData {
 
     public Set<UUID> getPrivateDimensions() {
         return privateDimensions;
+    }
+
+    public boolean isIslandPlaced(ResourceKey<Level> dimension) {
+        return islandPlacedDimensions.contains(dimension);
+    }
+
+    public void markIslandPlaced(ResourceKey<Level> dimension) {
+        if (islandPlacedDimensions.add(dimension)) setDirty();
     }
 
     public static class PlayerDimensionSettings {

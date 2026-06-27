@@ -1,6 +1,7 @@
 package com.tlmpersonal.tlmpersonaldimension.world;
 
 import com.tlmpersonal.tlmpersonaldimension.Config;
+import com.tlmpersonal.tlmpersonaldimension.PersonalDimensionSavedData;
 import com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -33,12 +34,12 @@ public class StructurePlacer {
     }
 
     public static void tryPlaceStructure(ServerLevel level) {
-        Set<BlockPos> levelIslands = placedIslands.computeIfAbsent(level.dimension(), k -> new HashSet<>());
-        if (levelIslands.contains(BlockPos.ZERO)) return;
+        PersonalDimensionSavedData data = PersonalDimensionSavedData.get(level);
+        if (data.isIslandPlaced(level.dimension())) return;
 
         int spawnY = getSafeSpawnY(level, 0, 0);
         placeStructureAt(level, new BlockPos(0, spawnY, 0));
-        levelIslands.add(BlockPos.ZERO);
+        data.markIslandPlaced(level.dimension());
     }
     
     public static void trySpawnNaturalIsland(ServerLevel level) {

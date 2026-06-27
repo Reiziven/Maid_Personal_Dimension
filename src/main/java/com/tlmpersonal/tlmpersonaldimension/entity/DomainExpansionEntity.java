@@ -202,7 +202,7 @@ public class DomainExpansionEntity extends Entity {
             return;
         }
 
-        if (remaining % 20 == 0 && isUsingEntityProtection()) {
+        if (remaining % 20 == 0) {
             applyEffects();
         }
 
@@ -274,27 +274,19 @@ public class DomainExpansionEntity extends Entity {
     public boolean isUsingDimensionRules() {
         if (this.level().isClientSide)
             return true;
-        ServerLevel serverLevel = (ServerLevel) this.level();
-        PersonalDimensionSavedData savedData = PersonalDimensionSavedData
-                .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
-        if (getOwnerId() != null) {
-            PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(getOwnerId());
-            return settings.isDomainExpansionUseDimensionRules();
-        }
         return Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES.get();
     }
 
     public boolean isUsingEntityProtection() {
         if (this.level().isClientSide)
             return true;
-        ServerLevel serverLevel = (ServerLevel) this.level();
-        PersonalDimensionSavedData savedData = PersonalDimensionSavedData
-                .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
-        if (getOwnerId() != null) {
-            PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(getOwnerId());
-            return settings.isDomainExpansionUseEntityProtection();
-        }
         return Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION.get();
+    }
+
+    public boolean isUsingEntityFiltering() {
+        if (this.level().isClientSide)
+            return true;
+        return Config.DOMAIN_EXPANSION_USE_ENTITY_FILTERING.get();
     }
 
     private void applyEffects() {
@@ -312,26 +304,15 @@ public class DomainExpansionEntity extends Entity {
         for (Entity e : serverLevel.getEntities(this, effectAABB)) {
             if (!effectAABB.contains(e.position()))
                 continue;
-            if (!Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
+            if (isUsingEntityFiltering() && !Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
                 // Remove entity if config enabled; otherwise teleport outside the domain
                 if (Config.REMOVE_BLOCKED_ENTITIES.get() && !(e instanceof Player) && !(e instanceof EntityMaid)) {
                     e.discard();
                 } else {
-                    // Teleport to a point just beyond the domain radius
-                    double angle = serverLevel.random.nextDouble() * 2 * Math.PI;
-                    double distance = RADIUS + 5.0;
-                    double targetX = this.getX() + Math.cos(angle) * distance;
-                    double targetZ = this.getZ() + Math.sin(angle) * distance;
-                    int safeY = Touhoulittlemaidpersonaldimension.findSafeSurfaceY(serverLevel, (int) targetX, (int) targetZ);
-                    if (safeY > serverLevel.getMinBuildHeight()) {
-                        e.teleportTo(targetX, safeY, targetZ);
-                    } else {
-                        e.teleportTo(targetX, e.getY(), targetZ);
-                    }
+                    Touhoulittlemaidpersonaldimension.expelFromDomain(e, serverLevel, this.getX(), this.getZ());
                 }
             } else {
-                // Apply each survival option independently (same logic as the personal
-                // dimension tick)
+                // Apply each survival option independently (same logic as the personal dimension tick)
                 if (e instanceof Player player && (settings.isDisableHunger() || Config.DISABLE_HUNGER.get())) {
                     player.getFoodData().setFoodLevel(20);
                 }
@@ -340,7 +321,7 @@ public class DomainExpansionEntity extends Entity {
                         && living.getHealth() < living.getMaxHealth()) {
                     living.heal(1.0f);
                 }
-                // Apply combat buffs/debuffs only when entity protection is enabled
+                // Apply combat buffs/debuffs only when entity protection effects are enabled
                 if (isUsingEntityProtection()) {
                     if (e instanceof Player player) {
                         if (player.getUUID().equals(ownerId)) {

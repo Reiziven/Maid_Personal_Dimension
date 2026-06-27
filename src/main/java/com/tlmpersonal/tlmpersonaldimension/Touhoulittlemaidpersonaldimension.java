@@ -657,23 +657,14 @@ public class Touhoulittlemaidpersonaldimension {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoinLevel(EntityJoinLevelEvent event) {
         Entity entity = event.getEntity();
-        if (entity.level().isClientSide()
-                || !(isOurDimension(entity.level().dimension()) || isUnderDimensionRules(entity)))
+        if (entity.level().isClientSide() || !isOurDimension(entity.level().dimension()))
             return;
         ServerLevel serverLevel = (ServerLevel) entity.level();
         UUID ownerId = getOwnerUUIDFromDimensionKey(serverLevel.dimension());
         if (ownerId == null)
             ownerId = getOwnerUUIDFromPosition(serverLevel, entity.getX(), entity.getZ());
-        // For overworld domains (domain expansion / cherry domain), resolve owner from
-        // the domain entity
-        if (ownerId == null) {
-            ownerId = getOwnerIdFromEntityAndLevel(entity, serverLevel);
-        }
-        if (ownerId == null) {
-            // No owner found means we're under a domain rule but can't identify owner —
-            // allow the entity
+        if (ownerId == null)
             return;
-        }
         if (!isAllowed(entity, ownerId, serverLevel, null)) {
             event.setCanceled(true);
             entity.discard();
@@ -1043,6 +1034,36 @@ public class Touhoulittlemaidpersonaldimension {
             mutablePos.move(0, -1, 0);
         }
         return minY - 1;
+    }
+
+    /**
+     * Expels an entity 25 blocks away from (centerX, centerZ) at a random angle,
+     * scanning upward from its current Y for a safe 2-air-block gap.
+     * Applies Glowing for 10 seconds after teleport.
+     */
+    public static void expelFromDomain(Entity entity, ServerLevel level, double centerX, double centerZ) {
+        double angle = level.random.nextDouble() * 2 * Math.PI;
+        double targetX = centerX + Math.cos(angle) * 25.0;
+        double targetZ = centerZ + Math.sin(angle) * 25.0;
+
+        // Scan upward from entity's current Y for 2 consecutive air blocks
+        int startY = (int) entity.getY();
+        int maxY = level.getMaxBuildHeight() - 2;
+        int safeY = startY;
+        BlockPos.MutableBlockPos check = new BlockPos.MutableBlockPos((int) targetX, startY, (int) targetZ);
+        for (int y = startY; y <= maxY; y++) {
+            check.set((int) targetX, y, (int) targetZ);
+            if (level.getBlockState(check).isAir() && level.getBlockState(check.above()).isAir()) {
+                safeY = y;
+                break;
+            }
+        }
+
+        entity.teleportTo(targetX, safeY, targetZ);
+        if (entity instanceof LivingEntity living) {
+            living.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                    net.minecraft.world.effect.MobEffects.GLOWING, 200, 0, false, false));
+        }
     }
 
     private static UUID getOwnerIdFromEntityAndLevel(Entity entity, Level level) {

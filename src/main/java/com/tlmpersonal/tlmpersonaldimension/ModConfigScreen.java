@@ -449,15 +449,22 @@ public class ModConfigScreen {
                 Component.literal("Use Dimension Rules"),
                 Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES.get())
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("If true, domain expansions enforce dimension-like rules: maid authority, natural healing etc."))
+                .setTooltip(Component.literal("If true, domain expansion enforce dimension-like rules: maid authority, natural healing etc."))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Use Entity Protection"),
                 Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION.get())
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("If true, domain expansions apply combat effects: allies get buffs, enemies get debuffs."))
+                .setTooltip(Component.literal("If true, domain expansion apply combat effects: allies get buffs, enemies get debuffs."))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Use Entity Filtering"),
+                Config.DOMAIN_EXPANSION_USE_ENTITY_FILTERING.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, domain expansion expels or removes blocked entities."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_USE_ENTITY_FILTERING::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Cherry Domain Affects Owner"),
@@ -465,6 +472,27 @@ public class ModConfigScreen {
                 .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, the Cherry Domain Bauble also creates an aura around the owner."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_AFFECTS_OWNER::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain: Use Dimension Rules"),
+                Config.CHERRY_DOMAIN_USE_DIMENSION_RULES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Cherry Domain enforces dimension-like rules: maid authority, natural healing etc."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_USE_DIMENSION_RULES::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain: Use Entity Protection"),
+                Config.CHERRY_DOMAIN_USE_ENTITY_PROTECTION.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, Cherry Domain applies combat effects: allies get buffs, enemies get Weakness and Slowness."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_USE_ENTITY_PROTECTION::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain: Use Entity Filtering"),
+                Config.CHERRY_DOMAIN_USE_ENTITY_FILTERING.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Cherry Domain expels or removes blocked entities."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_USE_ENTITY_FILTERING::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startIntSlider(
                 Component.literal("Cherry Domain Rules Bypass Chance (%)"),

@@ -237,8 +237,9 @@ public class PersonalDimensionGui extends Screen {
                         .build());
             }
 
+            y += 25;
             addScrollingWidget(Checkbox.builder(Component.literal("Mobs Neutral"), this.font)
-                    .pos(centerX + 10, y + 25)
+                    .pos(centerX + 10, y)
                     .selected(localSettings != null && localSettings.isEntityCannotTarget())
                     .onValueChange((checkbox, selected) -> {
                         localSettings.setEntityCannotTarget(selected);
@@ -246,28 +247,11 @@ public class PersonalDimensionGui extends Screen {
                     })
                     .build());
             addScrollingWidget(Checkbox.builder(Component.literal("Maid Authority"), this.font)
-                    .pos(centerX + 165, y + 25)
+                    .pos(centerX + 165, y)
                     .selected(localSettings != null && localSettings.isMaidAuthority())
                     .onValueChange((checkbox, selected) -> {
                         localSettings.setMaidAuthority(selected);
                         sendPacket(PersonalDimensionGuiPacket.Action.SET_MAID_AUTHORITY, String.valueOf(selected));
-                    })
-                    .build());
-            y += 50;
-            addScrollingWidget(Checkbox.builder(Component.literal("Domain Dim Rules"), this.font)
-                    .pos(centerX + 10, y)
-                    .selected(localSettings != null && localSettings.isDomainExpansionUseDimensionRules())
-                    .onValueChange((checkbox, selected) -> {
-                        localSettings.setDomainExpansionUseDimensionRules(selected);
-                        sendPacket(PersonalDimensionGuiPacket.Action.SET_DOMAIN_EXPANSION_DIMENSION_RULES, String.valueOf(selected));
-                    })
-                    .build());
-            addScrollingWidget(Checkbox.builder(Component.literal("Domain Entities Rules"), this.font)
-                    .pos(centerX + 165, y)
-                    .selected(localSettings != null && localSettings.isDomainExpansionUseEntityProtection())
-                    .onValueChange((checkbox, selected) -> {
-                        localSettings.setDomainExpansionUseEntityProtection(selected);
-                        sendPacket(PersonalDimensionGuiPacket.Action.SET_DOMAIN_EXPANSION_ENTITY_PROTECTION, String.valueOf(selected));
                     })
                     .build());
             y += 25;

@@ -204,7 +204,7 @@ public class CherryDomainEntity extends Entity {
             this.setPos(maid.getX(), maid.getY(), maid.getZ());
         }
 
-        if (remaining % 20 == 0 && isUsingEntityProtection()) {
+        if (remaining % 20 == 0) {
             applyEffects();
         }
 
@@ -577,7 +577,7 @@ public class CherryDomainEntity extends Entity {
         // Default volume: hRadius=2 (4 width), vHalf=10 (20 height) → 4×20×4=320
         double defaultVolume = 320.0;
         double currentVolume = (hRange * 2) * (vRange * 2) * (hRange * 2);
-        double densityMultiplier = (currentVolume / defaultVolume) * 0.4;
+        double densityMultiplier = (currentVolume / defaultVolume) * 0.3;
         
         // Calculate number of particles to spawn
         int particlesToSpawn = 0;
@@ -695,27 +695,19 @@ public class CherryDomainEntity extends Entity {
         if (bypassChance > 0 && this.level().random.nextInt(100) < bypassChance) {
             return false;
         }
-        ServerLevel serverLevel = (ServerLevel) this.level();
-        PersonalDimensionSavedData savedData = PersonalDimensionSavedData
-                .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
-        if (getOwnerId() != null) {
-            PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(getOwnerId());
-            return settings.isDomainExpansionUseDimensionRules();
-        }
-        return Config.DOMAIN_EXPANSION_USE_DIMENSION_RULES.get();
+        return Config.CHERRY_DOMAIN_USE_DIMENSION_RULES.get();
     }
 
     public boolean isUsingEntityProtection() {
         if (this.level().isClientSide)
             return true;
-        ServerLevel serverLevel = (ServerLevel) this.level();
-        PersonalDimensionSavedData savedData = PersonalDimensionSavedData
-                .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
-        if (getOwnerId() != null) {
-            PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(getOwnerId());
-            return settings.isDomainExpansionUseEntityProtection();
-        }
-        return Config.DOMAIN_EXPANSION_USE_ENTITY_PROTECTION.get();
+        return Config.CHERRY_DOMAIN_USE_ENTITY_PROTECTION.get();
+    }
+
+    public boolean isUsingEntityFiltering() {
+        if (this.level().isClientSide)
+            return true;
+        return Config.CHERRY_DOMAIN_USE_ENTITY_FILTERING.get();
     }
 
     // ======================== MAID LIGHT ========================
@@ -780,20 +772,11 @@ public class CherryDomainEntity extends Entity {
             double dy = e.getY() - this.getY();
             double dz = e.getZ() - this.getZ();
             if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
-                if (!Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
+                if (isUsingEntityFiltering() && !Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
                     if (Config.REMOVE_BLOCKED_ENTITIES.get() && !(e instanceof Player) && !(e instanceof EntityMaid)) {
                         e.discard();
                     } else {
-                        double angle = serverLevel.random.nextDouble() * 2 * Math.PI;
-                        double distance = hRadius + 5.0;
-                        double targetX = this.getX() + Math.cos(angle) * distance;
-                        double targetZ = this.getZ() + Math.sin(angle) * distance;
-                        int safeY = Touhoulittlemaidpersonaldimension.findSafeSurfaceY(serverLevel, (int) targetX, (int) targetZ);
-                        if (safeY > serverLevel.getMinBuildHeight()) {
-                            e.teleportTo(targetX, safeY, targetZ);
-                        } else {
-                            e.teleportTo(targetX, e.getY(), targetZ);
-                        }
+                        Touhoulittlemaidpersonaldimension.expelFromDomain(e, serverLevel, this.getX(), this.getZ());
                     }
                 } else {
                     if (e instanceof Player player && (settings.isDisableHunger() || Config.DISABLE_HUNGER.get())) {
@@ -804,6 +787,7 @@ public class CherryDomainEntity extends Entity {
                             && living.getHealth() < living.getMaxHealth()) {
                         living.heal(1.0f);
                     }
+                    // Apply combat buffs/debuffs only when entity protection effects are enabled
                     if (isUsingEntityProtection()) {
                         if (e instanceof Player player) {
                             if (player.getUUID().equals(ownerId)) {

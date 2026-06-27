@@ -117,6 +117,10 @@ public class Config {
         public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_DURATION_SECONDS;
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_USE_DIMENSION_RULES;
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_USE_ENTITY_PROTECTION;
+        public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_USE_ENTITY_FILTERING;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_USE_DIMENSION_RULES;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_USE_ENTITY_PROTECTION;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_USE_ENTITY_FILTERING;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_AFFECTS_OWNER;
 public static final ModConfigSpec.IntValue CHERRY_DOMAIN_HORIZONTAL_RADIUS;
 public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
@@ -381,20 +385,32 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .comment("How often (in seconds) the Domain Expansion consumes XP.")
                                 .defineInRange("domainExpansionXpCostIntervalSeconds", 10, 1, 3600);
                 DOMAIN_EXPANSION_USE_DIMENSION_RULES = BUILDER
-                                .comment("If true, domain expansions enforce dimension-like rules: maid authority, natural healing etc. Can be overridden per-player via GUI.")
+                                .comment("If true, domain expansion enforce dimension-like rules: maid authority, natural healing etc.")
                                 .define("domainExpansionUseDimensionRules", true);
                 DOMAIN_EXPANSION_USE_ENTITY_PROTECTION = BUILDER
-                                .comment("If true, domain expansions apply combat effects: allies get buffs (Strength III, Regen II, Resistance III, Absorption IV), enemies get Weakness II and Slowness V. Can be overridden per-player via GUI.")
+                                .comment("If true, domain expansions apply combat effects: allies get buffs, enemies get Weakness and Slowness.")
                                 .define("domainExpansionUseEntityProtection", true);
+                DOMAIN_EXPANSION_USE_ENTITY_FILTERING = BUILDER
+                                .comment("If true, domain expansions enforce entity filtering: blocked entities are expelled or removed.")
+                                .define("domainExpansionUseEntityFiltering", true);
+                CHERRY_DOMAIN_USE_DIMENSION_RULES = BUILDER
+                                .comment("If true, Cherry Domain enforces dimension-like rules: maid authority, natural healing etc.")
+                                .define("cherryDomainUseDimensionRules", true);
+                CHERRY_DOMAIN_USE_ENTITY_PROTECTION = BUILDER
+                                .comment("If true, Cherry Domain applies combat effects: allies get buffs, enemies get Weakness and Slowness.")
+                                .define("cherryDomainUseEntityProtection", false);
+                CHERRY_DOMAIN_USE_ENTITY_FILTERING = BUILDER
+                                .comment("If true, Cherry Domain enforces entity filtering: blocked entities are expelled or removed.")
+                                .define("cherryDomainUseEntityFiltering", true);
                 CHERRY_DOMAIN_AFFECTS_OWNER = BUILDER
                         .comment("If true, the Cherry Domain Bauble also creates an aura around the owner.")
                         .define("cherryDomainAffectsOwner", false);
                 CHERRY_DOMAIN_HORIZONTAL_RADIUS = BUILDER
                         .comment("Horizontal radius for Cherry Domain block placement (half width). 2 gives a 5x5 area. NOTE tat high value can cause lag")
-                        .defineInRange("cherryDomainHorizontalRadius", 2, 0, 100);
+                        .defineInRange("cherryDomainHorizontalRadius", 10, 0, 100);
                 CHERRY_DOMAIN_VERTICAL_HALF = BUILDER
                         .comment("Vertical half-range for Cherry Domain (half of total height). 10 gives a 20 block tall area. NOTE tat high value can cause lag")
-                        .defineInRange("cherryDomainVerticalHalf", 10, 0, 256);
+                        .defineInRange("cherryDomainVerticalHalf", 20, 0, 256);
                 CHERRY_DOMAIN_RULES_BYPASS_CHANCE = BUILDER
                         .comment("Percent chance (0-100) that Cherry Domain dimension rules are skipped on any given check. Default 20 means 20% chance rules won't apply.")
                         .defineInRange("cherryDomainRulesBypassChance", 30, 0, 100);
