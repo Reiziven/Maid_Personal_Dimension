@@ -17,6 +17,8 @@ public class Config {
 
         public static final ModConfigSpec.EnumValue<DimensionType> DIMENSION_TYPE;
         public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURES;
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> STRUCTURE_WHITELIST;
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> STRUCTURE_BLACKLIST;
         public static final ModConfigSpec.IntValue MAID_SPAWN_CHANCE;
 
         // YSM Maid Model Options
@@ -110,6 +112,7 @@ public class Config {
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_BAUBLE_CRAFTABLE;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_BAUBLE_CRAFTABLE;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_BAUBLE_CRAFTABLE;
+        public static final ModConfigSpec.BooleanValue TETHERED_TELEPORT_BAUBLE_CRAFTABLE;
 
         // Domain Expansion Bauble
         public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_ENABLED;
@@ -144,15 +147,34 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
 
         // Cat Familiar Bauble
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_EFFECT_COOLDOWN;
-        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_ATTACKS_ENTITIES;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_CAN_ATTACK;
         public static final ModConfigSpec.IntValue CAT_FAMILIAR_REVIVAL_COOLDOWN;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_DETECT_HOSTILES;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_DETECT_HOSTILES_CHAT;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_TELEPORTS_TO_TARGET;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_PARTICLES;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_ATTACK;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_HEALTH;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_DEFENCE;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS;
 
         static {
                 BUILDER.push("General Settings");
                 DIMENSION_TYPE = BUILDER.defineEnum("dimensionType", DimensionType.VOID);
-                ENABLE_STRUCTURES = BUILDER.define("enableStructures", true);
+                ENABLE_STRUCTURES = BUILDER
+                                .comment("If true, all structures generate normally in the personal dimension. If false, only structures in structureWhitelist will generate.")
+                                .define("enableStructures", false);
+                STRUCTURE_WHITELIST = BUILDER
+                                .comment("When enableStructures is false, only structures with IDs in this list will generate. The mod's own island (touhoulittlemaidpersonaldimension:my_island) is always implicitly allowed.")
+                                .defineList("structureWhitelist",
+                                                () -> List.of("touhoulittlemaidpersonaldimension:my_island"),
+                                                o -> o instanceof String);
+                STRUCTURE_BLACKLIST = BUILDER
+                                .comment("When enableStructures is true, structures with IDs in this list will be prevented from generating. Has no effect when enableStructures is false.")
+                                .defineList("structureBlacklist",
+                                                ArrayList::new,
+                                                o -> o instanceof String);
                 MAID_SPAWN_CHANCE = BUILDER
                                 .comment("Rare chance per chunk for a maid to spawn naturally in OVERWORLD or CHERRY dimensions (1 in x chunks). Set to 0 to disable.")
                                 .defineInRange("maidSpawnChance", 100, 0, 1000);
@@ -184,7 +206,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .define("disableHostileEntities", false);
                 ENTITY_WHITELIST_MODE = BUILDER.define("entityWhitelistMode", true);
                 ALLOWED_ENTITIES = BUILDER.defineList("allowedEntities",
-                                () -> List.of("touhou_little_maid:broom","touhou_little_maid:chair"),
+                                () -> List.of("touhou_little_maid:broom","touhou_little_maid:chair", "touhoulittlemaidpersonaldimension:cat_familiar"),
                                 o -> o instanceof String);
                 BLOCKED_ENTITIES = BUILDER.defineList("blockedEntities", ArrayList::new, o -> o instanceof String);
                 BUILDER.pop();
@@ -354,16 +376,19 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                 BUILDER.push("Bauble Configuration");
 
                 BUILDER.push("Bauble Crafting");
-                DOMAIN_EXPANSION_BAUBLE_CRAFTABLE = BUILDER
-                                .comment("If true, the Domain Expansion Bauble can be crafted at the altar in survival. Still obtainable via commands.")
-                                .define("domainExpansionBaubleCraftable", true);
-                CHERRY_DOMAIN_BAUBLE_CRAFTABLE = BUILDER
-                                .comment("If true, the Cherry Domain Bauble can be crafted at the altar in survival. Still obtainable via commands.")
-                                .define("cherryDomainBaubleCraftable", true);
-                CAT_FAMILIAR_BAUBLE_CRAFTABLE = BUILDER
-                                .comment("If true, the Cat Familiar Bauble can be crafted at the altar in survival. Still obtainable via commands.")
-                                .define("catFamiliarBaubleCraftable", true);
-                BUILDER.pop();
+            DOMAIN_EXPANSION_BAUBLE_CRAFTABLE = BUILDER
+                    .comment("If true, the Domain Expansion Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                    .define("domainExpansionBaubleCraftable", true);
+            CHERRY_DOMAIN_BAUBLE_CRAFTABLE = BUILDER
+                    .comment("If true, the Cherry Domain Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                    .define("cherryDomainBaubleCraftable", true);
+            CAT_FAMILIAR_BAUBLE_CRAFTABLE = BUILDER
+                    .comment("If true, the Cat Familiar Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                    .define("catFamiliarBaubleCraftable", true);
+            TETHERED_TELEPORT_BAUBLE_CRAFTABLE = BUILDER
+                    .comment("If true, the Tethered Teleport Bauble can be crafted at the altar in survival. Still obtainable via commands.")
+                    .define("tetheredTeleportBaubleCraftable", true);
+            BUILDER.pop();
 
                 BUILDER.push("Domain Expansion Bauble");
                 DOMAIN_EXPANSION_ENABLED = BUILDER
@@ -454,21 +479,42 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
 
                 BUILDER.push("Cat Familiar Bauble");
                 CAT_FAMILIAR_EFFECT_COOLDOWN = BUILDER
-                                .comment("If true, cat familiar beneficial effects have a cooldown between applications.")
-                                .define("catFamiliarEffectCooldown", true);
-                CAT_FAMILIAR_ATTACKS_ENTITIES = BUILDER
-                                .comment("If true, cat familiar will attack entities that attack the maid.")
-                                .define("catFamiliarAttacksEntities", true);
-                CAT_FAMILIAR_REVIVAL_COOLDOWN = BUILDER
-                                .comment("Cooldown in seconds before a dead cat familiar can be revived (respawned) by the maid.")
-                                .defineInRange("catFamiliarRevivalCooldown", 600, 0, 1000000);
+                .comment("If true, cat familiar beneficial effects have a cooldown between applications.")
+                .define("catFamiliarEffectCooldown", false);
+        CAT_FAMILIAR_CAN_ATTACK = BUILDER
+                .comment("If true, cat familiar can attack (self-defense, attack maid targets, and owner-related targets if enabled).")
+                .define("catFamiliarCanAttack", true);
+        CAT_FAMILIAR_REVIVAL_COOLDOWN = BUILDER
+                .comment("Cooldown in seconds before a dead cat familiar can be revived (respawned) by the maid.")
+                .defineInRange("catFamiliarRevivalCooldown", 600, 0, 1000000);
                 CAT_FAMILIAR_DETECT_HOSTILES = BUILDER
                                 .comment("If true, the cat familiar will detect hostile mobs within 128 blocks, apply Glowing for 30 seconds, and optionally whisper coordinates to the owner.")
                                 .define("catFamiliarDetectHostiles", false);
                 CAT_FAMILIAR_DETECT_HOSTILES_CHAT = BUILDER
                                 .comment("If true, the cat familiar will also send a chat whisper with coordinates when detecting a hostile mob. Requires catFamiliarDetectHostiles to be true.")
                                 .define("catFamiliarDetectHostilesChat", false);
-                BUILDER.pop();
+                CAT_FAMILIAR_TELEPORTS_TO_TARGET = BUILDER
+                                .comment("If true, the cat familiar will teleport to its attacking target when more than 3 blocks away.")
+                                .define("catFamiliarTeleportsToTarget", true);
+                CAT_FAMILIAR_PARTICLES = BUILDER
+                                .comment("If true, the cat familiar will spawn witch-like particles when teleporting and spawning.")
+                                .define("catFamiliarParticles", true);
+                CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK = BUILDER
+                                .comment("If true, the cat familiar will try to attack targets even if they are beyond its follow range, and will not teleport back to the maid until it stops attacking.")
+                                .define("catFamiliarIgnoreFollowRangeForAttack", false);
+                CAT_FAMILIAR_MIRROR_ATTACK = BUILDER
+                                .comment("If true, the cat familiar will mirror the maid's total attack damage.")
+                                .define("catFamiliarMirrorAttack", false);
+                CAT_FAMILIAR_MIRROR_HEALTH = BUILDER
+                                .comment("If true, the cat familiar will mirror the maid's total health.")
+                                .define("catFamiliarMirrorHealth", true);
+                CAT_FAMILIAR_MIRROR_DEFENCE = BUILDER
+                .comment("If true, the cat familiar will mirror the maid's total defence (armour + toughness).")
+                .define("catFamiliarMirrorDefence", false);
+        CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS = BUILDER
+                .comment("If true, the cat familiar will attack what the maid's owner attacks or is attacked by.")
+                .define("catFamiliarAttacksPlayerTargets", false);
+        BUILDER.pop();
                 
                 BUILDER.pop(); // End Bauble Configuration
         }

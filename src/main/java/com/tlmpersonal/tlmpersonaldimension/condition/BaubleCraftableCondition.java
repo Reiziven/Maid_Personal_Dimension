@@ -19,6 +19,7 @@ public record BaubleCraftableCondition(String bauble) implements ICondition {
             case "domain_expansion_bauble" -> Config.DOMAIN_EXPANSION_BAUBLE_CRAFTABLE.get();
             case "cherry_domain_bauble"    -> Config.CHERRY_DOMAIN_BAUBLE_CRAFTABLE.get();
             case "cat_familiar_bauble"     -> Config.CAT_FAMILIAR_BAUBLE_CRAFTABLE.get();
+            case "tethered_teleport_bauble"-> Config.TETHERED_TELEPORT_BAUBLE_CRAFTABLE.get();
             default -> true;
         };
     }

@@ -3,6 +3,7 @@ package com.tlmpersonal.tlmpersonaldimension;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.info.ServerCustomPackLoader;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
+import com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity;
 import com.tlmpersonal.tlmpersonaldimension.inventory.PersonalDimensionMenu;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
@@ -32,6 +33,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
@@ -56,6 +58,7 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerSetSpawnEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.EntityTravelToDimensionEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
@@ -262,6 +265,9 @@ public class Touhoulittlemaidpersonaldimension {
     public static final DeferredItem<Item> CAT_FAMILIAR_BAUBLE = ITEMS.register("cat_familiar_bauble",
             () -> new com.tlmpersonal.tlmpersonaldimension.item.CatFamiliarBaubleItem(
                     new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> TETHERED_TELEPORT_BAUBLE = ITEMS.register("tethered_teleport_bauble",
+            () -> new com.tlmpersonal.tlmpersonaldimension.item.TetheredTeleportBaubleItem(
+                    new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> PERSONAL_DIMENSION_TAB = CREATIVE_MODE_TABS
             .register("personal_dimension_tab", () -> CreativeModeTab.builder()
@@ -272,6 +278,7 @@ public class Touhoulittlemaidpersonaldimension {
                         output.accept(DOMAIN_EXPANSION_BAUBLE.get());
                         output.accept(CHERRY_DOMAIN_BAUBLE.get());
                         output.accept(CAT_FAMILIAR_BAUBLE.get());
+                        output.accept(TETHERED_TELEPORT_BAUBLE.get());
                     }).build());
 
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalDimensionMenu>> PERSONAL_DIMENSION_MENU = MENUS
@@ -1116,11 +1123,69 @@ public class Touhoulittlemaidpersonaldimension {
         if (!(event.getSource().getEntity() instanceof LivingEntity))
             return;
 
-        // 20% chance to fully dodge the damage (no damage, no knockback)
+        // 20% dodge chance
         if (entity.level().random.nextFloat() < 0.20f) {
             event.setCanceled(true);
+
+            if (entity instanceof com.tlmpersonal.tlmpersonaldimension.entity.CatFamiliarEntity cat &&
+                    com.tlmpersonal.tlmpersonaldimension.Config.CAT_FAMILIAR_TELEPORTS_TO_TARGET.get() &&
+                    !entity.level().isClientSide) {
+
+                ServerLevel level = (ServerLevel) entity.level();
+                Vec3 oldPos = cat.position();
+
+                // random offset target
+                double angle = level.random.nextDouble() * 2 * Math.PI;
+                double distance = 0.5 + level.random.nextDouble() * 1.5;
+
+                double tx = oldPos.x + Math.cos(angle) * distance;
+                double ty = oldPos.y;
+                double tz = oldPos.z + Math.sin(angle) * distance;
+
+                BlockPos target = new BlockPos((int) tx, (int) ty, (int) tz);
+
+                // your existing safe Y search
+                int safeY = cat.findSafeY(new BlockPos.MutableBlockPos(target.getX(), target.getY(), target.getZ()), level);
+
+                if (safeY > level.getMinBuildHeight()) {
+
+                    BlockPos finalPos = new BlockPos((int) tx, safeY, (int) tz);
+
+                    // IMPORTANT FIX: real space validation (snow/carpets/modded blocks fix)
+                    boolean canFit =
+                            level.getBlockState(finalPos).getCollisionShape(level, finalPos).isEmpty() &&
+                                    level.getBlockState(finalPos.above()).getCollisionShape(level, finalPos.above()).isEmpty();
+
+                    if (canFit) {
+                        CatFamiliarEntity.spawnWitchParticles(oldPos, level);
+
+                        cat.teleportTo(tx, safeY, tz);
+                        cat.stopNavigation();
+
+                        CatFamiliarEntity.spawnWitchParticles(cat.position(), level);
+                        return;
+                    }
+                }
+
+                // FALLBACK: center in current block (always works)
+                double fx = Math.floor(oldPos.x) + 0.5;
+                double fy = oldPos.y;
+                double fz = Math.floor(oldPos.z) + 0.5;
+
+                double jitter = 0.3;
+                double fallbackAngle = level.random.nextDouble() * Math.PI * 2;
+
+                fx += Math.cos(fallbackAngle) * jitter;
+                fz += Math.sin(fallbackAngle) * jitter;
+
+                CatFamiliarEntity.spawnWitchParticles(oldPos, level);
+
+                cat.teleportTo(fx, fy, fz);
+                cat.stopNavigation();
+            }
         }
     }
+
 
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public void onMaidOrOwnerHurt(LivingIncomingDamageEvent event) {
@@ -1419,6 +1484,16 @@ public class Touhoulittlemaidpersonaldimension {
             event.setCanceled(true);
     }
 
+    private static boolean hasTetheredTeleportBauble(EntityMaid maid) {
+        if (maid.getMaidBauble() == null) return false;
+        for (int i = 0; i < maid.getMaidBauble().getSlots(); i++) {
+            if (maid.getMaidBauble().getStackInSlot(i).is(TETHERED_TELEPORT_BAUBLE.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onEntityTravelToDimension(EntityTravelToDimensionEvent event) {
         if (event.getEntity() instanceof Player player && isOurDimension(player.level().dimension())) {
@@ -1428,7 +1503,7 @@ public class Touhoulittlemaidpersonaldimension {
                     serverPlayer.sendSystemMessage(Component.literal("This dimension is not whitelisted!"));
             }
         }
-        if (Config.MAID_TELEPORT_WITH_OWNER_DIMENSION.get() && event.getEntity() instanceof ServerPlayer ownerPlayer) {
+        if (event.getEntity() instanceof ServerPlayer ownerPlayer) {
             ServerLevel currentLevel = (ServerLevel) ownerPlayer.level();
             PersonalDimensionSavedData savedData = PersonalDimensionSavedData
                     .get(currentLevel.getServer().getLevel(Level.OVERWORLD));
@@ -1441,9 +1516,25 @@ public class Touhoulittlemaidpersonaldimension {
                 // Skip if the maid is already in the target dimension
                 if (maidInfo.lastLevel.equals(targetDim))
                     continue;
-                // Deduplicate: only queue if not already pending
-                if (MAIDS_PENDING_TELEPORT.add(maidUuid)) {
-                    MAIDS_TO_TELEPORT.add(new MaidTeleportData(maidUuid, ownerPlayer.getUUID(), targetDim, 0));
+                // Find the maid entity to check if it has the bauble
+                EntityMaid maid = null;
+                for (ServerLevel levelIter : currentLevel.getServer().getAllLevels()) {
+                    Entity entity = levelIter.getEntity(maidUuid);
+                    if (entity instanceof EntityMaid foundMaid) {
+                        maid = foundMaid;
+                        break;
+                    }
+                }
+                // Check if either the global config is on OR the maid has the bauble
+                boolean shouldTeleport = Config.MAID_TELEPORT_WITH_OWNER_DIMENSION.get();
+                if (!shouldTeleport && maid != null) {
+                    shouldTeleport = hasTetheredTeleportBauble(maid);
+                }
+                if (shouldTeleport) {
+                    // Deduplicate: only queue if not already pending
+                    if (MAIDS_PENDING_TELEPORT.add(maidUuid)) {
+                        MAIDS_TO_TELEPORT.add(new MaidTeleportData(maidUuid, ownerPlayer.getUUID(), targetDim, 0));
+                    }
                 }
             }
         }
@@ -1553,6 +1644,26 @@ public class Touhoulittlemaidpersonaldimension {
                         return;
                     }
                 }
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        net.minecraft.world.entity.player.Player player = event.getEntity();
+        if (player.level().isClientSide || !(player.level() instanceof ServerLevel serverLevel2))
+            return;
+        UUID playerId = player.getUUID();
+        for (ServerLevel lvl : serverLevel2.getServer().getAllLevels()) {
+            List<com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity> toRestore = new ArrayList<>();
+            for (Entity e : lvl.getAllEntities()) {
+                if (e instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain
+                        && playerId.equals(domain.getOwnerId())) {
+                    toRestore.add(domain);
+                }
+            }
+            for (com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity domain : toRestore) {
+                domain.restoreAndDiscard();
             }
         }
     }

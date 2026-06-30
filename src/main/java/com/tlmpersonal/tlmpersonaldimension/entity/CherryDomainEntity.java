@@ -79,6 +79,14 @@ public class CherryDomainEntity extends Entity {
         this.entityData.set(TICK_COUNT_REMAINING, 20);
     }
 
+    /** Immediately restores all converted blocks and removes this entity. */
+    public void restoreAndDiscard() {
+        if (!this.level().isClientSide) {
+            restoreDomain();
+        }
+        this.discard();
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(OWNER_ID, Optional.empty());

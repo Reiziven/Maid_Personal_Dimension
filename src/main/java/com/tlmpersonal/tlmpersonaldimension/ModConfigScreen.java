@@ -35,9 +35,23 @@ public class ModConfigScreen {
         general.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Enable Structures"),
                 Config.ENABLE_STRUCTURES.get())
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Toggle vanilla structures like villages"))
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, all structures generate except blacklisted ones. If false, only whitelisted structures generate (my_island always allowed)."))
                 .setSaveConsumer(Config.ENABLE_STRUCTURES::set)
+                .build());
+        general.addEntry(entryBuilder.startStrList(
+                Component.literal("Structure Whitelist"),
+                new ArrayList<>(Config.STRUCTURE_WHITELIST.get()))
+                .setDefaultValue(List.of("touhoulittlemaidpersonaldimension:my_island"))
+                .setTooltip(Component.literal("When Enable Structures is OFF, only these structure IDs will generate. my_island is always allowed regardless."))
+                .setSaveConsumer(Config.STRUCTURE_WHITELIST::set)
+                .build());
+        general.addEntry(entryBuilder.startStrList(
+                Component.literal("Structure Blacklist"),
+                new ArrayList<>(Config.STRUCTURE_BLACKLIST.get()))
+                .setDefaultValue(List.of())
+                .setTooltip(Component.literal("When Enable Structures is ON, these structure IDs will be blocked from generating."))
+                .setSaveConsumer(Config.STRUCTURE_BLACKLIST::set)
                 .build());
         general.addEntry(entryBuilder.startIntField(
                 Component.literal("Maid Spawn Chance"),
@@ -68,6 +82,41 @@ public class ModConfigScreen {
                 .setDefaultValue(true)
                 .setTooltip(Component.literal("Allow teleporting entities with shift-right click using Okina's door or maid teleporter"))
                 .setSaveConsumer(Config.ALLOW_ENTITY_TELEPORT::set)
+                .build());
+        general.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Maid Teleporter: Allow All Entities"),
+                Config.MAID_TELEPORTER_ALLOW_ALL_ENTITIES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, all entities can be teleported with the maid teleporter unless blacklisted or a boss."))
+                .setSaveConsumer(Config.MAID_TELEPORTER_ALLOW_ALL_ENTITIES::set)
+                .build());
+        general.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Maid Teleporter: Whitelist Mode"),
+                Config.MAID_TELEPORTER_ENTITY_WHITELIST_MODE.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, only entities in the allowed list can be teleported. If false, all except the blocked list."))
+                .setSaveConsumer(Config.MAID_TELEPORTER_ENTITY_WHITELIST_MODE::set)
+                .build());
+        general.addEntry(entryBuilder.startStrList(
+                Component.literal("Maid Teleporter: Allowed Entities"),
+                new ArrayList<>(Config.MAID_TELEPORTER_ALLOWED_ENTITIES.get()))
+                .setDefaultValue(List.of())
+                .setTooltip(Component.literal("Entity IDs allowed to be teleported with maid teleporter (e.g. 'minecraft:cow')."))
+                .setSaveConsumer(Config.MAID_TELEPORTER_ALLOWED_ENTITIES::set)
+                .build());
+        general.addEntry(entryBuilder.startStrList(
+                Component.literal("Maid Teleporter: Blocked Entities"),
+                new ArrayList<>(Config.MAID_TELEPORTER_BLOCKED_ENTITIES.get()))
+                .setDefaultValue(List.of())
+                .setTooltip(Component.literal("Entity IDs blocked from being teleported with maid teleporter (higher priority than whitelist)."))
+                .setSaveConsumer(Config.MAID_TELEPORTER_BLOCKED_ENTITIES::set)
+                .build());
+        general.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Maid Teleporter: Exclude Bosses"),
+                Config.MAID_TELEPORTER_EXCLUDE_BOSSES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, boss entities cannot be teleported with the maid teleporter."))
+                .setSaveConsumer(Config.MAID_TELEPORTER_EXCLUDE_BOSSES::set)
                 .build());
         general.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Private Dimension"),
@@ -134,7 +183,7 @@ public class ModConfigScreen {
                 .setSaveConsumer(Config.ENTITY_WHITELIST_MODE::set)
                 .build());
         entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Allowed Entities"), new ArrayList<>(Config.ALLOWED_ENTITIES.get()))
-                .setDefaultValue(List.of("touhou_little_maid:broom","touhou_little_maid:chair"))
+                .setDefaultValue(List.of("touhou_little_maid:broom","touhou_little_maid:chair", "touhoulittlemaidpersonaldimension:cat_familiar"))
                 .setTooltip(Component.literal("Use entity IDs like 'minecraft:zombie' or wildcards like 'minecraft:*' to allow all entities from a mod."))
                 .setSaveConsumer(Config.ALLOWED_ENTITIES::set)
                 .build());
@@ -525,21 +574,127 @@ public class ModConfigScreen {
                 .setTooltip(Component.literal("If false, blocks cannot be broken inside a domain expansion."))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_ENABLE_BLOCK_BREAKING::set)
                 .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Domain Expansion XP Cost Enabled"),
+                Config.DOMAIN_EXPANSION_XP_COST_ENABLED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Domain Expansion consumes XP levels over time."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_XP_COST_ENABLED::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Domain Expansion XP Cost (Levels)"),
+                Config.DOMAIN_EXPANSION_XP_COST.get())
+                .setDefaultValue(1)
+                .setMin(0)
+                .setMax(100)
+                .setTooltip(Component.literal("How many experience levels to consume per interval."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_XP_COST::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Domain Expansion XP Cost Interval (Seconds)"),
+                Config.DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS.get())
+                .setDefaultValue(10)
+                .setMin(1)
+                .setMax(3600)
+                .setTooltip(Component.literal("How often (in seconds) the Domain Expansion consumes XP."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Ally Strength Amplifier"),
+                Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), 0, 255)
+                .setDefaultValue(1)
+                .setTooltip(Component.literal("Strength amplifier for allies inside domain expansion (0=I, 1=II...)."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ALLY_STRENGTH::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Ally Regeneration Amplifier"),
+                Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), 0, 255)
+                .setDefaultValue(1)
+                .setTooltip(Component.literal("Regeneration amplifier for allies inside domain expansion (0=I, 1=II...)."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ALLY_REGEN::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Ally Resistance Amplifier"),
+                Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), 0, 255)
+                .setDefaultValue(1)
+                .setTooltip(Component.literal("Resistance amplifier for allies inside domain expansion (0=I, 1=II...)."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ALLY_RESISTANCE::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Enemy Weakness Amplifier"),
+                Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), 0, 255)
+                .setDefaultValue(0)
+                .setTooltip(Component.literal("Weakness amplifier for enemies inside domain expansion (0=I, 1=II...)."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Enemy Slowness Amplifier"),
+                Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), 0, 255)
+                .setDefaultValue(0)
+                .setTooltip(Component.literal("Slowness amplifier for enemies inside domain expansion (0=I, 1=II...)."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startStrField(
+                Component.literal("Domain Expansion Structure"),
+                Config.DOMAIN_EXPANSION_STRUCTURE.get())
+                .setDefaultValue("domain_expansion")
+                .setTooltip(Component.literal("Which structure to use for Domain Expansion: \"domain_expansion\" or \"my_island\"."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_STRUCTURE::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Cherry Domain Horizontal Radius"),
+                Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get(), 0, 100)
+                .setDefaultValue(10)
+                .setTooltip(Component.literal("Horizontal radius for Cherry Domain (half-width). High values can cause lag."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntSlider(
+                Component.literal("Cherry Domain Vertical Half"),
+                Config.CHERRY_DOMAIN_VERTICAL_HALF.get(), 0, 256)
+                .setDefaultValue(15)
+                .setTooltip(Component.literal("Vertical half-range for Cherry Domain (half of total height). High values can cause lag."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_VERTICAL_HALF::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain XP Cost Enabled"),
+                Config.CHERRY_DOMAIN_XP_COST_ENABLED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Cherry Domain consumes XP levels over time."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_XP_COST_ENABLED::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Cherry Domain XP Cost (Levels)"),
+                Config.CHERRY_DOMAIN_XP_COST.get())
+                .setDefaultValue(1)
+                .setMin(0)
+                .setMax(100)
+                .setTooltip(Component.literal("How many experience levels to consume per interval."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_XP_COST::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startIntField(
+                Component.literal("Cherry Domain XP Cost Interval (Seconds)"),
+                Config.CHERRY_DOMAIN_XP_COST_INTERVAL_SECONDS.get())
+                .setDefaultValue(120)
+                .setMin(1)
+                .setMax(3600)
+                .setTooltip(Component.literal("How often (in seconds) the Cherry Domain consumes XP."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_XP_COST_INTERVAL_SECONDS::set)
+                .build());
 
         ConfigCategory catFamiliar = builder.getOrCreateCategory(Component.literal("Cat Familiar Bauble"));
         catFamiliar.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Effect Application Cooldown"),
                 Config.CAT_FAMILIAR_EFFECT_COOLDOWN.get())
-                .setDefaultValue(true)
+                .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, cat familiar beneficial effects have a cooldown between applications."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_EFFECT_COOLDOWN::set)
                 .build());
         catFamiliar.addEntry(entryBuilder.startBooleanToggle(
-                Component.literal("Cat Attacks Entities"),
-                Config.CAT_FAMILIAR_ATTACKS_ENTITIES.get())
+                Component.literal("Cat Can Attack"),
+                Config.CAT_FAMILIAR_CAN_ATTACK.get())
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("If true, cat familiar will attack entities that attack the maid."))
-                .setSaveConsumer(Config.CAT_FAMILIAR_ATTACKS_ENTITIES::set)
+                .setTooltip(Component.literal("If true, cat familiar can attack (self-defense, attack maid targets, and owner-related targets if enabled)."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_CAN_ATTACK::set)
                 .build());
         catFamiliar.addEntry(entryBuilder.startIntSlider(
                 Component.literal("Cat Revival Cooldown (seconds)"),
@@ -562,6 +717,55 @@ public class ModConfigScreen {
                 .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, cat also sends a chat message with exact coordinates when a hostile is detected."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_DETECT_HOSTILES_CHAT::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Teleports to Target"),
+                Config.CAT_FAMILIAR_TELEPORTS_TO_TARGET.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, the cat familiar will teleport to its attacking target when more than 3 blocks away."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_TELEPORTS_TO_TARGET::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Particles"),
+                Config.CAT_FAMILIAR_PARTICLES.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, the cat familiar will spawn witch-like particles when teleporting and spawning."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_PARTICLES::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Ignore Follow Range for Attack"),
+                Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, the cat familiar will try to attack targets even if they are beyond its follow range, and will not teleport back to the maid until it stops attacking."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Mirror Maid Attack"),
+                Config.CAT_FAMILIAR_MIRROR_ATTACK.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, the cat familiar will mirror the maid's total attack damage."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_MIRROR_ATTACK::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Mirror Maid Health"),
+                Config.CAT_FAMILIAR_MIRROR_HEALTH.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, the cat familiar will mirror the maid's total health."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_MIRROR_HEALTH::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Mirror Maid Defence"),
+                Config.CAT_FAMILIAR_MIRROR_DEFENCE.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, the cat familiar will mirror the maid's total defence (armour + toughness)."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_MIRROR_DEFENCE::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Attacks Player Targets"),
+                Config.CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, the cat familiar will attack what the maid's owner attacks or is attacked by."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS::set)
                 .build());
 
         ConfigCategory baubleCrafting = builder.getOrCreateCategory(Component.literal("Bauble Crafting"));

@@ -10,6 +10,7 @@
   "item.touhoulittlemaidpersonaldimension.domain_expansion_bauble": "领域展开饰品",
   "item.touhoulittlemaidpersonaldimension.cherry_domain_bauble": "樱花领域饰品",
   "item.touhoulittlemaidpersonaldimension.cat_familiar_bauble": "猫咪伙伴饰品",
+  "item.touhoulittlemaidpersonaldimension.tethered_teleport_bauble": "羁绊传送饰品",
   "biome.touhoulittlemaidpersonaldimension.personal_biome": "女仆花园",
   "effect.touhoulittlemaidpersonaldimension.cat_reflexes": "猫咪反射",
   "effect.touhoulittlemaidpersonaldimension.feline_grace": "猫步轻灵",
@@ -136,5 +137,8 @@
   "tooltip.cat_familiar_bauble.effect.taunt": "§7  §d◆ §f生命值过低时§7 — §c自我牺牲§7：灵猫嘲讽周围所有敌人，吸引仇恨",
   "tooltip.cat_familiar_bauble.effect.bad_luck": "§7  §d◆ §f被攻击时§7 — §5霉运诅咒§7：对攻击者施加霉运，使其有10%概率攻击落空，持续1分钟",
   "tooltip.cat_familiar_bauble.effect.fall": "§7  §d◆ §f下落中 §a(1秒后)§7 — §a轻盈落地§7：减少70%坠落伤害",
-  "tooltip.cat_familiar_bauble.effect.luck": "§7  §d◆ §f被动§7 — §6幸运眷顾§7：灵猫在场时赋予 §6幸运 ∞"
+  "tooltip.cat_familiar_bauble.effect.luck": "§7  §d◆ §f被动§7 — §6幸运眷顾§7：灵猫在场时赋予 §6幸运 ∞",
+  "tooltip.tethered_teleport_bauble.hint": "§7按住 §6[SHIFT]§7 查看能力详情",
+  "tooltip.tethered_teleport_bauble.header": "§e✦ §l羁绊传送§r §e✦",
+  "tooltip.tethered_teleport_bauble.desc": "§e⚑ §7当你切换维度时，女仆会与你一起传送，即使未启用全局配置！"
 }

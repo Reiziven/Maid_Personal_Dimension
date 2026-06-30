@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BeehiveBlockEntityMixin",
+    "ChunkGeneratorMixin",
     "MinecraftServerMixin"
   ],
   "client": [],

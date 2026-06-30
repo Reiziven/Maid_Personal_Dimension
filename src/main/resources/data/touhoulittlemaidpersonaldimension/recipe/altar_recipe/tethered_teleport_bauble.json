@@ -1,0 +1,38 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "touhoulittlemaidpersonaldimension:bauble_craftable",
+      "bauble": "tethered_teleport_bauble"
+    }
+  ],
+  "type": "touhou_little_maid:altar_recipe_serializers",
+  "category": "misc",
+  "entity": "minecraft:item",
+  "group": "altar_recipe",
+  "ingredients": [
+    {
+      "item": "minecraft:ender_eye"
+    },
+    {
+      "item": "minecraft:ender_eye"
+    },
+    {
+      "item": "minecraft:ender_pearl"
+    },
+    {
+      "item": "touhou_little_maid:wireless_io"
+    },
+    {
+      "item": "minecraft:ender_pearl"
+    },
+    {
+      "item": "minecraft:ender_chest"
+    }
+  ],
+  "lang": "jei.touhou_little_maid.altar_craft.item_craft.result",
+  "power": 1.0,
+  "result": {
+    "count": 1,
+    "id": "touhoulittlemaidpersonaldimension:tethered_teleport_bauble"
+  }
+}

@@ -10,6 +10,7 @@
   "item.touhoulittlemaidpersonaldimension.domain_expansion_bauble": "Domain Expansion Bauble",
   "item.touhoulittlemaidpersonaldimension.cherry_domain_bauble": "Cherry Domain Bauble",
   "item.touhoulittlemaidpersonaldimension.cat_familiar_bauble": "Cat Familiar Bauble",
+  "item.touhoulittlemaidpersonaldimension.tethered_teleport_bauble": "Tethered Teleport Bauble",
   "biome.touhoulittlemaidpersonaldimension.personal_biome": "Maid Garden",
   "effect.touhoulittlemaidpersonaldimension.cat_reflexes": "Cat Reflexes",
   "effect.touhoulittlemaidpersonaldimension.feline_grace": "Feline Grace",
@@ -137,5 +138,8 @@
   "tooltip.cat_familiar_bauble.effect.bad_luck": "§7  §d◆ §fOn Attack§7 — §5Bad Luck§7: curses the attacker with 10% miss chance for 1 min",
   "tooltip.cat_familiar_bauble.effect.fall": "§7  §d◆ §fFalling §a(1s)§7 — §aSoft Landing§7: reduces fall damage by 70%",
   "tooltip.cat_familiar_bauble.effect.luck": "§7  §d◆ §fCat Presence§7 — §6Fortune's Favor§7: grants §6Luck ∞§7 while the familiar is present",
-  "tooltip.cat_familiar_bauble.effect.detection": "§7  §d◆ §fHostile Nearby§7 — §cDetection§7: highlights monsters with §fGlowing§7 §8(30s)"
+  "tooltip.cat_familiar_bauble.effect.detection": "§7  §d◆ §fHostile Nearby§7 — §cDetection§7: highlights monsters with §fGlowing§7 §8(30s)",
+  "tooltip.tethered_teleport_bauble.hint": "§7Hold §6[SHIFT]§7 to reveal abilities",
+  "tooltip.tethered_teleport_bauble.header": "§e✦ §lTethered Teleport§r §e✦",
+  "tooltip.tethered_teleport_bauble.desc": "§e⚑ §7Teleports the maid with you when you change dimensions, even without the global config enabled!"
 }

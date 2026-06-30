@@ -6,6 +6,7 @@ import com.tlmpersonal.tlmpersonaldimension.PersonalLevelData;
 import com.tlmpersonal.tlmpersonaldimension.PersonalLevelStateData;
 import com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension;
 import com.tlmpersonal.tlmpersonaldimension.accessor.MinecraftServerAccessor;
+import com.tlmpersonal.tlmpersonaldimension.worldgen.accessor.ChunkGeneratorAccessor;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -112,6 +113,11 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
             );
 
             PersonalLevelStateData.get(newLevel).attach(personalLevelData);
+
+            // Inject dimension key into ChunkGenerator so structure filtering can check it
+            if (newLevel.getChunkSource().getGenerator() instanceof ChunkGeneratorAccessor accessor) {
+                accessor.tlmpersonal$setDimensionKey(key);
+            }
 
             Touhoulittlemaidpersonaldimension.LOGGER.debug("Created dimension: {}", key.location());
 
