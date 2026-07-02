@@ -16,6 +16,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -95,13 +96,15 @@ public class CatFamiliarEntity extends Cat {
         this.goalSelector.addGoal(10, new RandomStrollGoal(this, 0.6D));
 
         if (Config.CAT_FAMILIAR_CAN_ATTACK.get()) {
-              this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.MeleeAttackGoal(this, 1.4D, true));
-            this.targetSelector.addGoal(1, new DefendSelfGoal(this));
-            this.targetSelector.addGoal(2, new AttackMaidTargetGoal(this));
-            this.targetSelector.addGoal(3, new DefendMaidGoal(this));
+            this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.MeleeAttackGoal(this, 1.4D, true));
+            this.targetSelector.addGoal(1, new SixthSenseMaidGoal(this));
+            this.targetSelector.addGoal(2, new DefendSelfGoal(this));
+            this.targetSelector.addGoal(3, new AttackMaidTargetGoal(this));
+            this.targetSelector.addGoal(4, new DefendMaidGoal(this));
             if (Config.CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS.get()) {
-                this.targetSelector.addGoal(4, new AttackOwnerTargetGoal(this));
-                this.targetSelector.addGoal(5, new DefendOwnerGoal(this));
+                this.targetSelector.addGoal(5, new SixthSenseOwnerGoal(this));
+                this.targetSelector.addGoal(6, new AttackOwnerTargetGoal(this));
+                this.targetSelector.addGoal(7, new DefendOwnerGoal(this));
             }
         }
     }
@@ -383,6 +386,24 @@ public class CatFamiliarEntity extends Cat {
 
     public void stopNavigation() {
         this.navigation.stop();
+    }
+
+    @Override
+    public boolean isCrouching() {
+        // Never show the stalking/crouching walk animation
+        return false;
+    }
+
+    @Override
+    public boolean doHurtTarget(Entity target) {
+        boolean result = super.doHurtTarget(target);
+        if (result && Config.CAT_FAMILIAR_BAUBLE_PROXY.get() && !this.level().isClientSide) {
+            EntityMaid maid = getMaidEntity((ServerLevel) this.level());
+            if (maid != null) {
+                maid.doHurtTarget(target);
+            }
+        }
+        return result;
     }
 
     @Override
@@ -1011,8 +1032,8 @@ public class CatFamiliarEntity extends Cat {
             if (ownerTarget == null || !ownerTarget.isAlive())
                 return false;
 
-            // Don't attack the maid or the owner
-            if (ownerTarget == maid || ownerTarget == owner)
+            // Don't attack the maid, the owner, or itself
+            if (ownerTarget == maid || ownerTarget == owner || ownerTarget == cat)
                 return false;
 
             double distSq = cat.distanceToSqr(ownerTarget);
@@ -1224,7 +1245,7 @@ public class CatFamiliarEntity extends Cat {
                     maid.getFavorabilityManager().add(1);
                     cat.lastInteractionTime = cat.level().getGameTime();
                     // Roll next interaction time once, so canUse() doesn't re-roll every tick
-                    cat.nextInteractionTime = cat.lastInteractionTime + 2400 + cat.random.nextInt(15600);
+                    cat.nextInteractionTime = cat.lastInteractionTime + 1200 + cat.random.nextInt(14600);
                     cat.isInteracting = false;
                 }
             }
@@ -1252,6 +1273,121 @@ public class CatFamiliarEntity extends Cat {
             maid.getBrain().setMemory(
                     net.minecraft.world.entity.ai.memory.MemoryModuleType.LOOK_TARGET,
                     new net.minecraft.world.entity.ai.behavior.EntityTracker(cat, true));
+        }
+    }
+
+    // Sixth sense: preemptively attack any mob that is currently targeting the maid
+    private static class SixthSenseMaidGoal extends net.minecraft.world.entity.ai.goal.target.TargetGoal {
+        private final CatFamiliarEntity cat;
+        private LivingEntity threat;
+
+        public SixthSenseMaidGoal(CatFamiliarEntity cat) {
+            super(cat, false);
+            this.cat = cat;
+            this.setFlags(java.util.EnumSet.of(Flag.TARGET));
+        }
+
+        @Override
+        public boolean canUse() {
+            // Only re-evaluate every 10 ticks
+            if (cat.tickCount % 10 != 0) return false;
+            if (cat.level().isClientSide)
+                return false;
+
+            EntityMaid maid = cat.getMaidEntity((ServerLevel) cat.level());
+            if (maid == null)
+                return false;
+
+            double range = Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get() ? 128 : FOLLOW_DISTANCE;
+            threat = null;
+            double bestDistSq = range * range;
+
+            for (Mob mob : ((ServerLevel) cat.level()).getEntitiesOfClass(
+                    Mob.class, cat.getBoundingBox().inflate(range),
+                    m -> m.isAlive() && maid.equals(m.getTarget()))) {
+                if ((Object) mob == maid) continue;
+                if (maid.getOwnerUUID() != null && mob.getUUID().equals(maid.getOwnerUUID())) continue;
+
+                double d = cat.distanceToSqr(mob);
+                if (d < bestDistSq) {
+                    bestDistSq = d;
+                    threat = mob;
+                }
+            }
+            return threat != null;
+        }
+
+        @Override
+        public void start() {
+            cat.setTarget(threat);
+            super.start();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            if (threat == null || !threat.isAlive()) return false;
+            if (cat.level().isClientSide) return false;
+            double allowedDist = Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get() ? 128 : FOLLOW_DISTANCE + 2;
+            return cat.distanceToSqr(threat) < allowedDist * allowedDist;
+        }
+    }
+
+    // Sixth sense: preemptively attack any mob that is currently targeting the player (owner)
+    private static class SixthSenseOwnerGoal extends net.minecraft.world.entity.ai.goal.target.TargetGoal {
+        private final CatFamiliarEntity cat;
+        private LivingEntity threat;
+
+        public SixthSenseOwnerGoal(CatFamiliarEntity cat) {
+            super(cat, false);
+            this.cat = cat;
+            this.setFlags(java.util.EnumSet.of(Flag.TARGET));
+        }
+
+        @Override
+        public boolean canUse() {
+            // Only re-evaluate every 10 ticks
+            if (cat.tickCount % 10 != 0) return false;
+            if (cat.level().isClientSide)
+                return false;
+
+            EntityMaid maid = cat.getMaidEntity((ServerLevel) cat.level());
+            if (maid == null || maid.getOwnerUUID() == null)
+                return false;
+
+            Player owner = ((ServerLevel) cat.level()).getPlayerByUUID(maid.getOwnerUUID());
+            if (owner == null)
+                return false;
+
+            double range = Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get() ? 128 : FOLLOW_DISTANCE;
+            threat = null;
+            double bestDistSq = range * range;
+
+            for (Mob mob : ((ServerLevel) cat.level()).getEntitiesOfClass(
+                    Mob.class, cat.getBoundingBox().inflate(range),
+                    m -> m.isAlive() && owner.equals(m.getTarget()))) {
+                if ((Object) mob == maid || (Object) mob == owner) continue;
+
+                double d = cat.distanceToSqr(mob);
+                if (d < bestDistSq) {
+                    bestDistSq = d;
+                    threat = mob;
+                }
+            }
+            return threat != null;
+        }
+
+        @Override
+        public void start() {
+            cat.setTarget(threat);
+            super.start();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            if (threat == null || !threat.isAlive()) return false;
+            if (cat.level().isClientSide) return false;
+            double allowedDist = Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get() ? 128 : FOLLOW_DISTANCE + 2;
+            return cat.distanceToSqr(threat) < allowedDist * allowedDist;
         }
     }
 }

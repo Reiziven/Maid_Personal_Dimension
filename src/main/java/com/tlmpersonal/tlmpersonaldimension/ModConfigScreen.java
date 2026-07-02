@@ -767,6 +767,13 @@ public class ModConfigScreen {
                 .setTooltip(Component.literal("If true, the cat familiar will attack what the maid's owner attacks or is attacked by."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS::set)
                 .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Bauble Proxy Attack"),
+                Config.CAT_FAMILIAR_BAUBLE_PROXY.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, when the cat attacks a target it also triggers the maid's full bauble attack pipeline (e.g. true damage, on-hit effects). Note: maid weapon durability will be consumed."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_BAUBLE_PROXY::set)
+                .build());
 
         ConfigCategory baubleCrafting = builder.getOrCreateCategory(Component.literal("Bauble Crafting"));
         baubleCrafting.addEntry(entryBuilder.startBooleanToggle(

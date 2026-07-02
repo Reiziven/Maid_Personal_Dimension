@@ -101,8 +101,12 @@ public class CatFamiliarBauble implements IMaidBauble {
             }
             CompoundTag pd = maid.getPersistentData();
             if (pd.contains(CAT_HEALTH_KEY)) {
+                // Restoring a picked-up cat — use saved health
                 float savedHealth = pd.getFloat(CAT_HEALTH_KEY);
                 cat.setHealth(Math.min(savedHealth, cat.getMaxHealth()));
+            } else {
+                // Reviving after death — always spawn at full max health
+                cat.setHealth(cat.getMaxHealth());
             }
             serverLevel.addFreshEntity(cat);
             // Spawn particles at spawn location

@@ -184,13 +184,11 @@ public record TeleportToPersonalDimensionPacket(int maidId, boolean teleportWith
 
         player.teleportTo(targetDim, targetX, targetY, targetZ, Set.of(), targetYRot, targetXRot);
         if (maidEntity != null) {
-            Touhoulittlemaidpersonaldimension.TeleportLocation savedMaidPos = Touhoulittlemaidpersonaldimension.getEntityPosition(maidEntity.getUUID(), targetDim.dimension());
-            
-            if (savedMaidPos == null) {
-                maidEntity.teleportTo(targetDim, targetX, targetY, targetZ, Set.of(), targetYRot, targetXRot);
-            } else {
-                maidEntity.teleportTo(targetDim, savedMaidPos.x(), savedMaidPos.y(), savedMaidPos.z(), Set.of(), savedMaidPos.yRot(), savedMaidPos.xRot());
-            }
+            // Use the same deferred queue as TetheredTeleportBauble so the maid's
+            // changeDimension is handled on the server tick after the player has arrived,
+            // preventing ghost entities or maid data loss from direct cross-dim teleports.
+            Touhoulittlemaidpersonaldimension.enqueueMaidTeleport(
+                maidEntity.getUUID(), player.getUUID(), targetDim.dimension());
         }
     }
 }

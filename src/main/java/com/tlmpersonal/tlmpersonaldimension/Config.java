@@ -158,6 +158,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_HEALTH;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_DEFENCE;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_BAUBLE_PROXY;
 
         static {
                 BUILDER.push("General Settings");
@@ -514,6 +515,9 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS = BUILDER
                 .comment("If true, the cat familiar will attack what the maid's owner attacks or is attacked by.")
                 .define("catFamiliarAttacksPlayerTargets", false);
+        CAT_FAMILIAR_BAUBLE_PROXY = BUILDER
+                .comment("If true, when the cat attacks a target it also triggers the maid's full bauble attack pipeline (e.g. true damage, on-hit effects). Note: maid weapon durability will be consumed.")
+                .define("catFamiliarBaubleProxy", false);
         BUILDER.pop();
                 
                 BUILDER.pop(); // End Bauble Configuration

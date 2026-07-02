@@ -320,6 +320,15 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
+        com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid.EXTENSIONS.add(new com.github.tartaricacid.touhoulittlemaid.api.ILittleMaid() {
+            @Override
+            public void bindMaidBauble(com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager manager) {
+                manager.bind(DOMAIN_EXPANSION_BAUBLE.get(), new com.tlmpersonal.tlmpersonaldimension.item.DomainExpansionBauble());
+                manager.bind(CHERRY_DOMAIN_BAUBLE.get(), new com.tlmpersonal.tlmpersonaldimension.item.CherryDomainBauble());
+                manager.bind(CAT_FAMILIAR_BAUBLE.get(), new com.tlmpersonal.tlmpersonaldimension.item.CatFamiliarBauble());
+                manager.bind(TETHERED_TELEPORT_BAUBLE.get(), new com.tlmpersonal.tlmpersonaldimension.item.TetheredTeleportBauble());
+            }
+        });
     }
 
     private void registerEntityAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {
@@ -1528,7 +1537,10 @@ public class Touhoulittlemaidpersonaldimension {
                 // Check if either the global config is on OR the maid has the bauble
                 boolean shouldTeleport = Config.MAID_TELEPORT_WITH_OWNER_DIMENSION.get();
                 if (!shouldTeleport && maid != null) {
-                    shouldTeleport = hasTetheredTeleportBauble(maid);
+                    // Tethered teleport bauble only follows when maid is not sitting or in home mode
+                    if (hasTetheredTeleportBauble(maid) && !maid.isOrderedToSit() && !maid.isHomeModeEnable()) {
+                        shouldTeleport = true;
+                    }
                 }
                 if (shouldTeleport) {
                     // Deduplicate: only queue if not already pending
@@ -1537,6 +1549,17 @@ public class Touhoulittlemaidpersonaldimension {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Enqueues a maid for cross-dimension teleport using the same deferred queue
+     * as the TetheredTeleport bauble. This avoids the direct changeDimension call
+     * that can cause ghost entities or data loss when other mods intercept it.
+     */
+    public static void enqueueMaidTeleport(UUID maidUuid, UUID ownerUuid, ResourceKey<Level> targetDim) {
+        if (MAIDS_PENDING_TELEPORT.add(maidUuid)) {
+            MAIDS_TO_TELEPORT.add(new MaidTeleportData(maidUuid, ownerUuid, targetDim, 0));
         }
     }
 
