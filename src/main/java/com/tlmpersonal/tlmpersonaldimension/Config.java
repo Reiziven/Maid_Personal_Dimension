@@ -139,11 +139,13 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING;
         public static final ModConfigSpec.ConfigValue<String> DOMAIN_EXPANSION_STRUCTURE;
         // Domain Expansion buff/debuff amplifiers (0 = level I, 1 = level II, etc.)
-        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_STRENGTH;
-        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_REGEN;
-        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_RESISTANCE;
-        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_WEAKNESS;
-        public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_SLOWNESS;
+                public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_STRENGTH;
+                public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_REGEN;
+                public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ALLY_RESISTANCE;
+                public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_WEAKNESS;
+                public static final ModConfigSpec.IntValue DOMAIN_EXPANSION_ENEMY_SLOWNESS;
+                public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_GENERATE_PINK_PETALS;
+                public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_ENABLE_TORNADO;
 
         // Cat Familiar Bauble
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_EFFECT_COOLDOWN;
@@ -159,6 +161,8 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_DEFENCE;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_ATTACKS_PLAYER_TARGETS;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_BAUBLE_PROXY;
+        public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_ATTACK_SPEED;
+        public static final ModConfigSpec.DoubleValue CAT_FAMILIAR_ATTACK_RANGE_BONUS;
 
         static {
                 BUILDER.push("General Settings");
@@ -476,6 +480,12 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                 DOMAIN_EXPANSION_ENEMY_SLOWNESS = BUILDER
                                 .comment("Slowness amplifier for enemies inside domain expansion (0=I ... 9=X...).")
                                 .defineInRange("domainExpansionEnemySlowness", 0, 0, 255);
+                CHERRY_DOMAIN_GENERATE_PINK_PETALS = BUILDER
+                        .comment("If true, Cherry Domain generates pink petals on grass blocks.")
+                        .define("cherryDomainGeneratePinkPetals", true);
+                CHERRY_DOMAIN_ENABLE_TORNADO = BUILDER
+                        .comment("If true, Cherry Domain has a tornado border swirl of cherry leaves.")
+                        .define("cherryDomainEnableTornado", true);
                 BUILDER.pop();
 
                 BUILDER.push("Cat Familiar Bauble");
@@ -517,7 +527,13 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                 .define("catFamiliarAttacksPlayerTargets", false);
         CAT_FAMILIAR_BAUBLE_PROXY = BUILDER
                 .comment("If true, when the cat attacks a target it also triggers the maid's full bauble attack pipeline (e.g. true damage, on-hit effects). Note: maid weapon durability will be consumed.")
-                .define("catFamiliarBaubleProxy", false);
+                .define("catFamiliarBaubleProxy", true);
+        CAT_FAMILIAR_MIRROR_ATTACK_SPEED = BUILDER
+                .comment("If true, the cat familiar will mirror the maid's total attack speed (including weapon modifiers). Keeps balance — a maid with a slow axe will make the cat attack slower too.")
+                .define("catFamiliarMirrorAttackSpeed", true);
+        CAT_FAMILIAR_ATTACK_RANGE_BONUS = BUILDER
+                .comment("Extra melee attack reach in blocks added to the cat familiar's base reach. Default 3.0 adds 3 extra blocks of range.")
+                .defineInRange("catFamiliarAttackRangeBonus", 3.0, 0.0, 10.0);
         BUILDER.pop();
                 
                 BUILDER.pop(); // End Bauble Configuration

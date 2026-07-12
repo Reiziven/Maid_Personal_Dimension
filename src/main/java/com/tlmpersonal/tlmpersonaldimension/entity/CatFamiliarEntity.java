@@ -96,7 +96,7 @@ public class CatFamiliarEntity extends Cat {
         this.goalSelector.addGoal(10, new RandomStrollGoal(this, 0.6D));
 
         if (Config.CAT_FAMILIAR_CAN_ATTACK.get()) {
-            this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.MeleeAttackGoal(this, 1.4D, true));
+            this.goalSelector.addGoal(3, new AttackSpeedMeleeGoal(this, 1.4D, true));
             this.targetSelector.addGoal(1, new SixthSenseMaidGoal(this));
             this.targetSelector.addGoal(2, new DefendSelfGoal(this));
             this.targetSelector.addGoal(3, new AttackMaidTargetGoal(this));
@@ -114,9 +114,17 @@ public class CatFamiliarEntity extends Cat {
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.4)
                 .add(Attributes.FOLLOW_RANGE, 128.0) // Set to larger range for attacking, FollowOwnerGoal uses startDistance
-                .add(Attributes.ATTACK_DAMAGE, 6.0)
+                .add(Attributes.ATTACK_DAMAGE, 4.0)
+                .add(Attributes.ATTACK_SPEED, 4.0) // Default: same as player bare-hand speed
                 .add(Attributes.ARMOR, 0.0)
                 .add(Attributes.ARMOR_TOUGHNESS, 0.0);
+    }
+
+    @Override
+    protected net.minecraft.world.phys.AABB getAttackBoundingBox() {
+        // Expand the attack hitbox by the configured bonus in all directions (including vertical for flying enemies)
+        double bonus = Config.CAT_FAMILIAR_ATTACK_RANGE_BONUS.get();
+        return super.getAttackBoundingBox().inflate(bonus, bonus, bonus);
     }
 
     @Override
@@ -446,6 +454,12 @@ public class CatFamiliarEntity extends Cat {
 
             double maidArmorToughness = maid.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
             this.getAttribute(Attributes.ARMOR_TOUGHNESS).setBaseValue(maidArmorToughness);
+        }
+
+        // Sync attack speed if config enabled
+        if (Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED.get()) {
+            double maidAttackSpeed = maid.getAttributeValue(Attributes.ATTACK_SPEED);
+            this.getAttribute(Attributes.ATTACK_SPEED).setBaseValue(maidAttackSpeed);
         }
     }
 
@@ -1329,6 +1343,59 @@ public class CatFamiliarEntity extends Cat {
             if (cat.level().isClientSide) return false;
             double allowedDist = Config.CAT_FAMILIAR_IGNORE_FOLLOW_RANGE_FOR_ATTACK.get() ? 128 : FOLLOW_DISTANCE + 2;
             return cat.distanceToSqr(threat) < allowedDist * allowedDist;
+        }
+    }
+
+    // Custom MeleeAttackGoal that respects the ATTACK_SPEED attribute when CAT_FAMILIAR_MIRROR_ATTACK_SPEED is enabled.
+    // Vanilla MeleeAttackGoal hardcodes a 20-tick (1 second) attack interval; we intercept resetAttackCooldown()
+    // and track our own counter since the parent field is private.
+    private static class AttackSpeedMeleeGoal extends net.minecraft.world.entity.ai.goal.MeleeAttackGoal {
+        private final CatFamiliarEntity cat;
+        private int customCooldown = 0;
+        private boolean useCustomCooldown = false;
+
+        AttackSpeedMeleeGoal(CatFamiliarEntity cat, double speedModifier, boolean followIfNotSeen) {
+            super(cat, speedModifier, followIfNotSeen);
+            this.cat = cat;
+        }
+
+        /** Compute interval in ticks from ATTACK_SPEED attribute (attacks/sec). */
+        private int computeInterval() {
+            double attackSpeed = cat.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED);
+            int interval = (int) Math.round(20.0 / Math.max(attackSpeed, 0.2));
+            return Math.max(2, Math.min(interval, 100));
+        }
+
+        @Override
+        public void start() {
+            super.start();
+            customCooldown = 0;
+            useCustomCooldown = Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED.get();
+        }
+
+        @Override
+        public void tick() {
+            useCustomCooldown = Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED.get();
+            if (useCustomCooldown && customCooldown > 0) customCooldown--;
+            super.tick();
+        }
+
+        @Override
+        protected void resetAttackCooldown() {
+            useCustomCooldown = Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED.get();
+            if (useCustomCooldown) {
+                customCooldown = this.adjustedTickDelay(computeInterval());
+            } else {
+                super.resetAttackCooldown();
+            }
+        }
+
+        @Override
+        protected boolean isTimeToAttack() {
+            if (useCustomCooldown) {
+                return customCooldown <= 0;
+            }
+            return super.isTimeToAttack();
         }
     }
 

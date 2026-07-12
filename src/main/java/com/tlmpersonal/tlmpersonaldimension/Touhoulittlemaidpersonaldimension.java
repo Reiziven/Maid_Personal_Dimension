@@ -88,6 +88,10 @@ public class Touhoulittlemaidpersonaldimension {
             .create(Registries.MOB_EFFECT, MODID);
     public static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.conditions.ICondition>> CONDITIONS = DeferredRegister
             .create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.CONDITION_CODECS, MODID);
+    public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(net.minecraft.core.registries.Registries.PARTICLE_TYPE, MODID);
+
+    public static final DeferredHolder<net.minecraft.core.particles.ParticleType<?>, net.minecraft.core.particles.SimpleParticleType> STRAIGHT_CHERRY_PARTICLE = PARTICLES.register("straight_cherry",
+            () -> new net.minecraft.core.particles.SimpleParticleType(false));
 
     public static final net.neoforged.neoforge.registries.DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.conditions.ICondition>, com.mojang.serialization.MapCodec<com.tlmpersonal.tlmpersonaldimension.condition.BaubleCraftableCondition>> BAUBLE_CRAFTABLE_CONDITION = CONDITIONS
             .register("bauble_craftable",
@@ -146,7 +150,7 @@ public class Touhoulittlemaidpersonaldimension {
                 double dx = entity.getX() - domain.getX();
                 double dy = entity.getY() - domain.getY();
                 double dz = entity.getZ() - domain.getZ();
-                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) {
                     return true;
                 }
             }
@@ -175,7 +179,7 @@ public class Touhoulittlemaidpersonaldimension {
                 int dx = pos.getX() - domain.blockPosition().getX();
                 int dy = pos.getY() - domain.blockPosition().getY();
                 int dz = pos.getZ() - domain.blockPosition().getZ();
-                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) {
                     return true;
                 }
             }
@@ -296,6 +300,7 @@ public class Touhoulittlemaidpersonaldimension {
         ENTITY_TYPES.register(modEventBus);
         MOB_EFFECTS.register(modEventBus);
         CONDITIONS.register(modEventBus);
+        PARTICLES.register(modEventBus);
         NeoForge.EVENT_BUS.register(this);
         modEventBus.addListener(this::addCreative);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -1612,7 +1617,7 @@ public class Touhoulittlemaidpersonaldimension {
                 int dx = pos.getX() - domain.blockPosition().getX();
                 int dy = pos.getY() - domain.blockPosition().getY();
                 int dz = pos.getZ() - domain.blockPosition().getZ();
-                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) {
                     if (!Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get()) {
                         event.setCanceled(true);
                         return;
@@ -1661,7 +1666,7 @@ public class Touhoulittlemaidpersonaldimension {
                 int dx = pos.getX() - domain.blockPosition().getX();
                 int dy = pos.getY() - domain.blockPosition().getY();
                 int dz = pos.getZ() - domain.blockPosition().getZ();
-                if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+                if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) {
                     if (!Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING.get()) {
                         event.setCanceled(true);
                         return;
@@ -1722,7 +1727,7 @@ public class Touhoulittlemaidpersonaldimension {
                     int dx = pos.getX() - domain.blockPosition().getX();
                     int dy = pos.getY() - domain.blockPosition().getY();
                     int dz = pos.getZ() - domain.blockPosition().getZ();
-                    if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius)
+                    if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf)
                         return true;
                 }
                 return false;

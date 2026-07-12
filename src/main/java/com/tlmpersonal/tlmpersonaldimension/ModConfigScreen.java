@@ -558,6 +558,20 @@ public class ModConfigScreen {
                 .setTooltip(Component.literal("If false, blocks cannot be broken inside a cherry domain."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_ENABLE_BLOCK_BREAKING::set)
                 .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain: Generate Pink Petals"),
+                Config.CHERRY_DOMAIN_GENERATE_PINK_PETALS.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Cherry Domain generates pink petals on grass blocks."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_GENERATE_PINK_PETALS::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain: Enable Tornado"),
+                Config.CHERRY_DOMAIN_ENABLE_TORNADO.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, Cherry Domain has a tornado border swirl of cherry leaves."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_ENABLE_TORNADO::set)
+                .build());
         domainExpansion.addEntry(entryBuilder.startDoubleField(
                 Component.literal("Minimum Domain Distance"),
                 Config.DOMAIN_EXPANSION_MIN_DISTANCE.get())
@@ -770,9 +784,25 @@ public class ModConfigScreen {
         catFamiliar.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Cat Bauble Proxy Attack"),
                 Config.CAT_FAMILIAR_BAUBLE_PROXY.get())
-                .setDefaultValue(false)
+                .setDefaultValue(true)
                 .setTooltip(Component.literal("If true, when the cat attacks a target it also triggers the maid's full bauble attack pipeline (e.g. true damage, on-hit effects). Note: maid weapon durability will be consumed."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_BAUBLE_PROXY::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cat Mirror Attack Speed"),
+                Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, the cat familiar will use the same total attack speed as the maid (including weapon modifiers). An axe maid will make the cat attack slower too."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_MIRROR_ATTACK_SPEED::set)
+                .build());
+        catFamiliar.addEntry(entryBuilder.startDoubleField(
+                Component.literal("Cat Attack Range Bonus (blocks)"),
+                Config.CAT_FAMILIAR_ATTACK_RANGE_BONUS.get())
+                .setDefaultValue(3.0)
+                .setMin(0.0)
+                .setMax(10.0)
+                .setTooltip(Component.literal("Extra melee reach added to the cat familiar's base attack range. 3.0 = 3 extra blocks."))
+                .setSaveConsumer(Config.CAT_FAMILIAR_ATTACK_RANGE_BONUS::set)
                 .build());
 
         ConfigCategory baubleCrafting = builder.getOrCreateCategory(Component.literal("Bauble Crafting"));

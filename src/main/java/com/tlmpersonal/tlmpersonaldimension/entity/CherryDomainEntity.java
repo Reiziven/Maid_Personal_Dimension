@@ -29,6 +29,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.PinkPetalsBlock;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
@@ -240,17 +242,18 @@ public class CherryDomainEntity extends Entity {
     // ======================== BLOCK REPLACEMENT LOGIC ========================
 
     private void updateBlocks(ServerLevel level, EntityMaid maid, Player owner) {
-        Set<BlockPos> inRange = new HashSet<>();
-        collectPositionsInRange(maid, inRange);
-        if (Config.CHERRY_DOMAIN_AFFECTS_OWNER.get() && owner != null && owner.level() == level) {
-            collectPositionsInRange(owner, inRange);
-        }
-
         List<BlockPos> toRestore = new ArrayList<>();
-        for (BlockPos pos : new ArrayList<>(savedBlocks.keySet())) {
-            if (!inRange.contains(pos)) {
+        for (BlockPos pos : savedBlocks.keySet()) {
+            boolean inRange = false;
+            if (maid != null && isPosInRange(pos, maid)) {
+                inRange = true;
+            } else if (Config.CHERRY_DOMAIN_AFFECTS_OWNER.get() && owner != null && owner.level() == level && isPosInRange(pos, owner)) {
+                inRange = true;
+            }
+
+            if (!inRange || !Config.CHERRY_DOMAIN_GENERATE_PINK_PETALS.get()) {
                 int count = outOfRangeCounter.getOrDefault(pos, 0) + 1;
-                if (count >= 6) {
+                if (count >= 6 || !Config.CHERRY_DOMAIN_GENERATE_PINK_PETALS.get()) {
                     toRestore.add(pos);
                     outOfRangeCounter.remove(pos);
                 } else {
@@ -273,62 +276,85 @@ public class CherryDomainEntity extends Entity {
         }
     }
 
-    private void collectPositionsInRange(Entity entity, Set<BlockPos> inRange) {
-        if (entity == null)
-            return;
+    private boolean isPosInRange(BlockPos pos, Entity entity) {
         BlockPos center = entity.blockPosition();
-        for (int x = -HORIZONTAL_RADIUS; x <= HORIZONTAL_RADIUS; x++) {
-            for (int z = -HORIZONTAL_RADIUS; z <= HORIZONTAL_RADIUS; z++) {
-                for (int y = -VERTICAL_HALF; y <= VERTICAL_HALF - 1; y++) {
-                    inRange.add(center.offset(x, y, z));
-                }
-            }
-        }
+        double dx = pos.getX() - center.getX();
+        double dz = pos.getZ() - center.getZ();
+        return dx * dx + dz * dz <= HORIZONTAL_RADIUS * HORIZONTAL_RADIUS &&
+               pos.getY() >= center.getY() - VERTICAL_HALF &&
+               pos.getY() <= center.getY() + VERTICAL_HALF - 1;
     }
 
     private void transformAroundEntity(Entity entity, ServerLevel level) {
         BlockPos center = entity.blockPosition();
+        BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
 
         // 1) Floor petals: 5x5 at feet level, only on grass blocks
-        for (int x = -HORIZONTAL_RADIUS; x <= HORIZONTAL_RADIUS; x++) {
-            for (int z = -HORIZONTAL_RADIUS; z <= HORIZONTAL_RADIUS; z++) {
-                BlockPos floorPos = center.offset(x, -1, z);
-                BlockPos petalPos = floorPos.above();
+        if (Config.CHERRY_DOMAIN_GENERATE_PINK_PETALS.get()) {
+            BlockPos.MutableBlockPos petalPos = new BlockPos.MutableBlockPos();
+            for (int x = -HORIZONTAL_RADIUS; x <= HORIZONTAL_RADIUS; x++) {
+                for (int z = -HORIZONTAL_RADIUS; z <= HORIZONTAL_RADIUS; z++) {
+                    if (x * x + z * z > HORIZONTAL_RADIUS * HORIZONTAL_RADIUS) continue;
+                    petalPos.setWithOffset(center, x, 0, z);
 
-                if (savedBlocks.containsKey(petalPos))
-                    continue;
+                    if (savedBlocks.containsKey(petalPos))
+                        continue;
 
-                BlockState floorState = level.getBlockState(floorPos);
-                if (!floorState.is(Blocks.GRASS_BLOCK))
-                    continue;
+                    mPos.setWithOffset(center, x, -1, z);
+                    BlockState floorState = level.getBlockState(mPos);
+                    if (!floorState.is(Blocks.GRASS_BLOCK))
+                        continue;
 
-                BlockState aboveState = level.getBlockState(petalPos);
-                if (!aboveState.getFluidState().isEmpty())
-                    continue;
-                if (isProtectedPlant(aboveState))
-                    continue;
-                if (!aboveState.isAir() && !aboveState.canBeReplaced() && !aboveState.is(Blocks.PINK_PETALS))
-                    continue;
-                if (aboveState.is(Blocks.PINK_PETALS))
-                    continue;
+                    BlockState aboveState = level.getBlockState(petalPos);
+                    if (!aboveState.getFluidState().isEmpty())
+                        continue;
+                    if (isProtectedPlant(aboveState))
+                        continue;
+                    if (!aboveState.isAir() && !aboveState.canBeReplaced() && !aboveState.is(Blocks.PINK_PETALS))
+                        continue;
+                    if (aboveState.is(Blocks.PINK_PETALS))
+                        continue;
 
-                savedBlocks.put(petalPos, aboveState);
-                level.setBlock(petalPos, Blocks.PINK_PETALS.defaultBlockState(), SET_BLOCK_FLAGS);
+                    // Deterministic coordinate-based hash to scatter petals (approx 10% chance)
+                    int hash = petalPos.getX() * 31337 + petalPos.getY() * 104395301 + petalPos.getZ() * 83492791;
+                    if (Math.abs(hash) % 100 > 10)
+                        continue;
+
+                    // Amount 2 to 4, based on hash (as requested)
+                    int amount = (Math.abs(hash / 100) % 3) + 2;
+                    
+                    // Facing direction based on hash (optimized without streams)
+                    Direction[] directions = new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
+                    Direction facing = directions[Math.abs(hash / 400) % 4];
+
+                    BlockState petalState = Blocks.PINK_PETALS.defaultBlockState();
+                    if (petalState.hasProperty(PinkPetalsBlock.AMOUNT)) {
+                        petalState = petalState.setValue(PinkPetalsBlock.AMOUNT, amount);
+                    }
+                    if (petalState.hasProperty(PinkPetalsBlock.FACING)) {
+                        petalState = petalState.setValue(PinkPetalsBlock.FACING, facing);
+                    }
+
+                    BlockPos immutablePetalPos = petalPos.immutable();
+                    savedBlocks.put(immutablePetalPos, aboveState);
+                    level.setBlock(immutablePetalPos, petalState, SET_BLOCK_FLAGS);
+                }
             }
         }
 
         // 2) Block replacement: 5x5 XZ, 20Y vertical
         for (int x = -HORIZONTAL_RADIUS; x <= HORIZONTAL_RADIUS; x++) {
             for (int z = -HORIZONTAL_RADIUS; z <= HORIZONTAL_RADIUS; z++) {
+                if (x * x + z * z > HORIZONTAL_RADIUS * HORIZONTAL_RADIUS) continue;
                 for (int y = -VERTICAL_HALF; y <= VERTICAL_HALF - 1; y++) {
-                    BlockPos pos = center.offset(x, y, z);
-                    if (savedBlocks.containsKey(pos))
+                    mPos.setWithOffset(center, x, y, z);
+                    if (savedBlocks.containsKey(mPos))
                         continue;
 
-                    BlockState currentState = level.getBlockState(pos);
-                    Block replacement = getCherryReplacement(currentState);
+                    BlockState currentState = level.getBlockState(mPos);
+                    Block replacement = getCherryReplacementCached(currentState);
                     if (replacement != null) {
-                        saveAndReplace(level, pos, currentState, replacement);
+                        saveAndReplace(level, mPos.immutable(), currentState, replacement);
                     }
                 }
             }
@@ -462,6 +488,19 @@ public class CherryDomainEntity extends Entity {
 
     // ======================== CHERRY/PINK BLOCK MAPPING ========================
 
+    private static final Map<Block, Block> REPLACEMENT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private Block getCherryReplacementCached(BlockState state) {
+        Block block = state.getBlock();
+        Block cached = REPLACEMENT_CACHE.get(block);
+        if (cached != null) {
+            return cached == Blocks.AIR ? null : cached;
+        }
+        Block replacement = getCherryReplacement(state);
+        REPLACEMENT_CACHE.put(block, replacement == null ? Blocks.AIR : replacement);
+        return replacement;
+    }
+
     private Block getCherryReplacement(BlockState state) {
         Block block = state.getBlock();
         String name = BuiltInRegistries.BLOCK.getKey(block).getPath();
@@ -573,33 +612,69 @@ public class CherryDomainEntity extends Entity {
     // ======================== CHERRY PARTICLES ========================
 
     private void spawnCherryParticles(ServerLevel level, Entity entity) {
-        if (entity == null)
-            return;
+        if (entity == null) return;
+
         double cx = entity.getX();
-        double cy = entity.getY() + 1.5;
+        double cy = entity.getY();
         double cz = entity.getZ();
-        
+
         double hRange = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
         double vRange = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
-        
-        // Default volume: hRadius=2 (4 width), vHalf=10 (20 height) → 4×20×4=320
-        double defaultVolume = 320.0;
-        double currentVolume = (hRange * 2) * (vRange * 2) * (hRange * 2);
-        double densityMultiplier = (currentVolume / defaultVolume) * 0.3;
-        
-        // Calculate number of particles to spawn
-        int particlesToSpawn = 0;
-        double fractionalPart = densityMultiplier / 3; // Default is 1/3 chance
-        particlesToSpawn += (int) fractionalPart;
-        if (level.random.nextDouble() < (fractionalPart - (int) fractionalPart)) {
-            particlesToSpawn += 1;
+
+        // 1) Spawn a few inside (circularly) - always on
+        int insideParticles = (int) (hRange * 0.5);
+        if (insideParticles < 1) insideParticles = 1;
+
+        for (int i = 0; i < insideParticles; i++) {
+            if (level.random.nextFloat() < 0.25f) {
+                double angle = level.random.nextDouble() * Math.PI * 2;
+                double r = Math.sqrt(level.random.nextDouble()) * hRange;
+                double x = cx + Math.cos(angle) * r;
+                double y = cy + (level.random.nextDouble() - 0.5) * (vRange * 2);
+                double z = cz + Math.sin(angle) * r;
+
+                level.sendParticles(com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension.STRAIGHT_CHERRY_PARTICLE.get(), x, y, z, 1, 0.0, -0.06, 0.0, 0.01);
+            }
         }
-        
-        for (int i = 0; i < particlesToSpawn; i++) {
-            double x = cx + (level.random.nextDouble() - 0.5) * (hRange * 2);
-            double y = cy + (level.random.nextDouble() - 0.5) * (vRange * 2);
-            double z = cz + (level.random.nextDouble() - 0.5) * (hRange * 2);
-            level.sendParticles(ParticleTypes.CHERRY_LEAVES, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+
+        // 2) Tornado swirl at the border (cylinder wall) - continuous diagonal swirl
+        if (Config.CHERRY_DOMAIN_ENABLE_TORNADO.get()) {
+            int ticks = this.tickCount;
+            double speed = 0.018;
+
+            int numArms = 3;
+            int particlesPerArm = (int) Math.max(6, Math.min(10, vRange * 1.2));
+
+            // Spawn 3 vertical "slices" per tick with time offsets so gaps get filled
+            for (int slice = 0; slice < 3; slice++) {
+                double timeOffset = (slice / 3.0) * (2 * Math.PI / numArms);
+
+                for (int arm = 0; arm < numArms; arm++) {
+                    double armOffset = (Math.PI * 2.0 / numArms) * arm;
+
+                    for (int i = 0; i < particlesPerArm; i++) {
+                        double yProgress = (double) i / particlesPerArm;
+                        double heightTwist = yProgress * Math.PI * 4.0;
+                        double baseAngle = (ticks * speed) + armOffset + heightTwist + timeOffset;
+                        double angle = baseAngle + (level.random.nextDouble() - 0.5) * 0.2;
+
+                        double cos = Math.cos(angle);
+                        double sin = Math.sin(angle);
+                        double currentRange = hRange + (level.random.nextDouble() - 0.5) * 0.3;
+
+                        double x = cx + cos * currentRange;
+                        double z = cz + sin * currentRange;
+                        double y = (cy - vRange) + (yProgress * vRange * 2.0);
+                        y += (level.random.nextDouble() - 0.5) * 0.4;
+
+                        double xSpeed = -sin * 0.04;
+                        double zSpeed = cos * 0.04;
+
+                        level.sendParticles(com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension.STRAIGHT_CHERRY_PARTICLE.get(),
+                                x, y, z, 1, xSpeed, -0.02, zSpeed, 0.0);
+                    }
+                }
+            }
         }
     }
 
@@ -654,7 +729,11 @@ public class CherryDomainEntity extends Entity {
                     center.getBoundingBox().inflate(HORIZONTAL_RADIUS + 1, VERTICAL_HALF, HORIZONTAL_RADIUS + 1))) {
                 if (e instanceof net.minecraft.world.entity.item.ItemEntity item
                         && item.getItem().is(net.minecraft.world.item.Items.PINK_PETALS)) {
-                    item.discard();
+                    double dx = e.getX() - center.getX();
+                    double dz = e.getZ() - center.getZ();
+                    if (dx * dx + dz * dz <= HORIZONTAL_RADIUS * HORIZONTAL_RADIUS) {
+                        item.discard();
+                    }
                 }
             }
         }
@@ -664,7 +743,11 @@ public class CherryDomainEntity extends Entity {
         for (Entity e : level.getEntities(source,
                 source.getBoundingBox().inflate(HORIZONTAL_RADIUS + 1, VERTICAL_HALF, HORIZONTAL_RADIUS + 1))) {
             if (e instanceof Sheep || e instanceof Boat) {
-                result.add(e.getUUID());
+                double dx = e.getX() - source.getX();
+                double dz = e.getZ() - source.getZ();
+                if (dx * dx + dz * dz <= HORIZONTAL_RADIUS * HORIZONTAL_RADIUS) {
+                    result.add(e.getUUID());
+                }
             }
         }
     }
@@ -779,7 +862,7 @@ public class CherryDomainEntity extends Entity {
             double dx = e.getX() - this.getX();
             double dy = e.getY() - this.getY();
             double dz = e.getZ() - this.getZ();
-            if (Math.abs(dx) <= hRadius && Math.abs(dy) <= vHalf && Math.abs(dz) <= hRadius) {
+            if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) {
                 if (isUsingEntityFiltering() && !Touhoulittlemaidpersonaldimension.isAllowed(e, ownerId, serverLevel, settings)) {
                     if (Config.REMOVE_BLOCKED_ENTITIES.get() && !(e instanceof Player) && !(e instanceof EntityMaid)) {
                         e.discard();
