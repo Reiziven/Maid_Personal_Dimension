@@ -380,9 +380,47 @@ public class DomainExpansionEntity extends Entity {
 
         // Place structure and save only the blocks it will overwrite
         StructureTemplateManager templateManager = serverLevel.getServer().getStructureManager();
-        Optional<StructureTemplate> templateOpt = templateManager
-                .get(ResourceLocation.fromNamespaceAndPath(Touhoulittlemaidpersonaldimension.MODID,
-                        Config.DOMAIN_EXPANSION_STRUCTURE.get()));
+        
+        // Parse the structure config to support both simple names and full namespaced paths
+        String structureConfig = Config.DOMAIN_EXPANSION_STRUCTURE.get().trim();
+        ResourceLocation structureLocation;
+        
+        try {
+            // If the config contains a colon, treat it as a full namespaced path (e.g. "minecraft:village/plains/houses/plains_small_house_1")
+            // Otherwise, assume it's a structure in this mod's namespace
+            if (structureConfig.contains(":")) {
+                structureLocation = ResourceLocation.parse(structureConfig);
+            } else {
+                structureLocation = ResourceLocation.fromNamespaceAndPath(Touhoulittlemaidpersonaldimension.MODID, structureConfig);
+            }
+        } catch (net.minecraft.ResourceLocationException e) {
+            // Invalid resource location format
+            Touhoulittlemaidpersonaldimension.LOGGER.error("Invalid structure name format: '{}'. Error: {}", structureConfig, e.getMessage());
+            
+            // Notify the owner
+            UUID ownerId = getOwnerId();
+            if (ownerId != null) {
+                Player owner = serverLevel.getPlayerByUUID(ownerId);
+                if (owner != null) {
+                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "§cDomain Expansion failed: Invalid structure name format!"));
+                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "§7Config value: '" + structureConfig + "'"));
+                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "§7Must be either 'structure_name' or 'namespace:path/to/structure'"));
+                }
+            }
+            return;
+        }
+        
+        Optional<StructureTemplate> templateOpt = templateManager.get(structureLocation);
+        
+        // If not found and looks like a structure set (no path), try to give helpful message
+        if (templateOpt.isEmpty() && !structureConfig.contains("/")) {
+            Touhoulittlemaidpersonaldimension.LOGGER.warn("Structure '{}' not found. If this is a structure set like 'minecraft:village_plains', you need to use a specific structure piece path instead.", structureLocation);
+            Touhoulittlemaidpersonaldimension.LOGGER.warn("Example: Instead of 'minecraft:village_plains', use 'minecraft:village/plains/houses/plains_small_house_1'");
+            Touhoulittlemaidpersonaldimension.LOGGER.warn("Available vanilla village pieces include paths like: village/plains/houses/*, village/plains/town_centers/*, etc.");
+        }
         if (templateOpt.isPresent()) {
             StructureTemplate template = templateOpt.get();
             BlockPos structurePos = center.offset(-template.getSize().getX() / 2, 0,
@@ -481,6 +519,28 @@ public class DomainExpansionEntity extends Entity {
             for (Entity e : serverLevel.getEntities(this, structureAABB)) {
                 if (!savedEntityPositions.containsKey(e.getUUID()) && !(e instanceof Player) && e != this) {
                     structureEntities.add(e.getUUID());
+                }
+            }
+        } else {
+            // Structure template not found - log warning and notify owner
+            Touhoulittlemaidpersonaldimension.LOGGER.error("Domain Expansion structure template not found: {}", structureLocation);
+            Touhoulittlemaidpersonaldimension.LOGGER.error("Make sure the structure file exists at: data/{}/structures/{}.nbt", 
+                structureLocation.getNamespace(), structureLocation.getPath());
+            Touhoulittlemaidpersonaldimension.LOGGER.error("NOTE: Structure sets like 'minecraft:village_plains' won't work - you need specific piece paths like 'minecraft:village/plains/houses/plains_small_house_1'");
+            
+            // Notify the owner if present
+            UUID ownerId = getOwnerId();
+            if (ownerId != null) {
+                Player owner = serverLevel.getPlayerByUUID(ownerId);
+                if (owner != null) {
+                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "§cDomain Expansion failed: Structure '" + structureLocation + "' not found!"));
+                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "§7Structure template must exist as an NBT file."));
+                    if (!structureConfig.contains("/")) {
+                        owner.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                            "§7Tip: Use specific structure piece paths like 'minecraft:village/plains/houses/plains_small_house_1'"));
+                    }
                 }
             }
         }

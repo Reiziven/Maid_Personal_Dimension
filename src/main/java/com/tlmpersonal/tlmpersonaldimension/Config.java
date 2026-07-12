@@ -463,7 +463,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .comment("If false, blocks cannot be broken inside a cherry domain.")
                                 .define("cherryDomainEnableBlockBreaking", true);
                 DOMAIN_EXPANSION_STRUCTURE = BUILDER
-                                .comment("Which structure to use for Domain Expansion (\"domain_expansion\" or \"my_island\").")
+                                .comment("Structure NBT template to use for Domain Expansion. Use short name for mod structures ('domain_expansion', 'my_island') or full namespace for custom ('minecraft:my_structure', 'mypack:arena'). Structure must exist as .nbt file in data/<namespace>/structures/<path>.nbt. NOT for world-gen structures - use structure blocks to export those first.")
                                 .define("domainExpansionStructure", "domain_expansion");
                 DOMAIN_EXPANSION_ALLY_STRENGTH = BUILDER
                                 .comment("Strength amplifier for allies inside domain expansion (0=I, 1=II, 2=III...).")

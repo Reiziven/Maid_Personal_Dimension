@@ -115,7 +115,7 @@
   "tooltip.domain_expansion_bauble.hint": "§7Hold §6[SHIFT]§7 to reveal abilities",
   "tooltip.domain_expansion_bauble.header": "§5✦ §lDomain Expansion§r §5✦",
   "tooltip.domain_expansion_bauble.trigger": "§e⚡ §7Triggers when the maid is attacked §8(requires favorability lvl 3)",
-  "tooltip.domain_expansion_bauble.structure": "§b⬡ §7Manifests a personal domain around her — a miniature extension of the maid's dimension",
+  "tooltip.domain_expansion_bauble.structure": "§b⬡ §7Manifests a structure from NBT files §8(configurable: vanilla structures, mod structures, or custom)",
   "tooltip.domain_expansion_bauble.rules": "§b⬡ §7Follows the same rules as your personal dimension §8(entity protection & survival options)",
   "tooltip.domain_expansion_bauble.effects_header": "§d◈ §lWhile inside the domain§r§d:",
   "tooltip.domain_expansion_bauble.effect.ally": "§7  §a◆ §fMaid & Owner§7 — Strength II, Regeneration II, Resistance II",

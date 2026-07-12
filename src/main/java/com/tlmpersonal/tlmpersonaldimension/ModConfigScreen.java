@@ -652,7 +652,7 @@ public class ModConfigScreen {
                 Component.literal("Domain Expansion Structure"),
                 Config.DOMAIN_EXPANSION_STRUCTURE.get())
                 .setDefaultValue("domain_expansion")
-                .setTooltip(Component.literal("Which structure to use for Domain Expansion: \"domain_expansion\" or \"my_island\"."))
+                .setTooltip(Component.literal("Structure NBT to use. Use short name (\"domain_expansion\", \"my_island\") or full namespace path (e.g. \"minecraft:village/plains/houses/plains_small_house_1\"). Must exist in data/<namespace>/structures/<path>.nbt"))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_STRUCTURE::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startIntSlider(
