@@ -485,13 +485,10 @@ public class CherryDomainEntity extends Entity {
         }
         savedBoatTypes.clear();
 
-        // Clean up maid light block when domain ends
+        // Clean up maid light block when domain ends (uses stored dimension, not just serverLevel)
         UUID maidId = getMaidId();
         if (maidId != null) {
-            BlockPos lp = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maidId);
-            if (lp != null && serverLevel.getBlockState(lp).is(Blocks.LIGHT)) {
-                serverLevel.setBlockAndUpdate(lp, Blocks.AIR.defaultBlockState());
-            }
+            Touhoulittlemaidpersonaldimension.removeMaidLight(maidId, serverLevel.getServer());
         }
     }
 
@@ -815,12 +812,9 @@ public class CherryDomainEntity extends Entity {
     private void applyMaidLight(ServerLevel serverLevel, EntityMaid maid) {
         UUID maidId = getMaidId();
         if (maid == null) {
+            // Maid gone — clean up its light using the stored dimension, not just serverLevel
             if (maidId != null) {
-                BlockPos lastP = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maidId);
-                if (lastP != null && serverLevel.getBlockState(lastP).is(Blocks.LIGHT)) {
-                    serverLevel.setBlockAndUpdate(lastP, Blocks.AIR.defaultBlockState());
-                    Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maidId);
-                }
+                Touhoulittlemaidpersonaldimension.removeMaidLight(maidId, serverLevel.getServer());
             }
             return;
         }
@@ -831,27 +825,26 @@ public class CherryDomainEntity extends Entity {
                 .get(serverLevel.getServer().getLevel(Level.OVERWORLD));
         PersonalDimensionSavedData.PlayerDimensionSettings settings = savedData.getOrCreateSettings(ownerId);
         if (!(settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get())) {
-            BlockPos lastP = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
-            if (lastP != null && serverLevel.getBlockState(lastP).is(Blocks.LIGHT)) {
-                serverLevel.setBlockAndUpdate(lastP, Blocks.AIR.defaultBlockState());
-                Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maid.getUUID());
-            }
+            // Setting turned off — remove via helper so we hit the right level
+            Touhoulittlemaidpersonaldimension.removeMaidLight(maid.getUUID(), serverLevel.getServer());
             return;
         }
 
         BlockPos newLightPos = maid.blockPosition().above();
-        BlockPos lastLightPos = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
+        Touhoulittlemaidpersonaldimension.MaidLightEntry lastEntry =
+                Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
+        BlockPos lastLightPos = lastEntry != null ? lastEntry.pos() : null;
 
-        // Always remove old light first if maid has moved
-        if (lastLightPos != null && !lastLightPos.equals(newLightPos)
-                && serverLevel.getBlockState(lastLightPos).is(Blocks.LIGHT)) {
-            serverLevel.setBlockAndUpdate(lastLightPos, Blocks.AIR.defaultBlockState());
+        // Always remove old light first if maid has moved (hits the right level via entry)
+        if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+            Touhoulittlemaidpersonaldimension.removeMaidLight(maid.getUUID(), serverLevel.getServer());
         }
         // Place new light if spot is free
         BlockState atNew = serverLevel.getBlockState(newLightPos);
         if (atNew.isAir() || atNew.is(Blocks.LIGHT)) {
             serverLevel.setBlockAndUpdate(newLightPos, Blocks.LIGHT.defaultBlockState());
-            Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
+            Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(),
+                    new Touhoulittlemaidpersonaldimension.MaidLightEntry(newLightPos, serverLevel.dimension()));
         } else if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
             // Can't place at new pos, but maid has moved — remove from map
             Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maid.getUUID());

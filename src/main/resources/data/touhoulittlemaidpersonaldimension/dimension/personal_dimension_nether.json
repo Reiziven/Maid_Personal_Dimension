@@ -1,5 +1,5 @@
 {
-  "type": "touhoulittlemaidpersonaldimension:personal_dimension",
+  "type": "touhoulittlemaidpersonaldimension:personal_dimension_nether",
   "generator": {
     "type": "minecraft:noise",
     "settings": "minecraft:nether",

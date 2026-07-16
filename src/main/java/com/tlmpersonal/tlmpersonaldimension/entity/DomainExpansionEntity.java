@@ -58,6 +58,12 @@ public class DomainExpansionEntity extends Entity {
     // Bounding box of the placed structure, used for effect range checks
     private net.minecraft.world.phys.AABB structureAABB = null;
 
+    // Command-time overrides (null/negative = fall back to config)
+    private String structureOverride = null;
+    private int durationOverride = -2; // -2 = unset, -1 = infinite, >=0 = seconds
+    private boolean costOverride = true; // false = no XP cost regardless of config
+    private boolean hasCostOverride = false; // whether costOverride was explicitly set
+
     public DomainExpansionEntity(EntityType<?> entityType, Level level) {
         super(entityType, level);
         this.noPhysics = true;
@@ -79,11 +85,32 @@ public class DomainExpansionEntity extends Entity {
         return this.entityData.get(MAID_ID).orElse(null);
     }
 
+    /** Set a structure override for this domain (used by commands). */
+    public void setStructureOverride(String structureName) {
+        this.structureOverride = structureName;
+    }
+
+    /** Set a duration override in seconds. -1 = infinite. */
+    public void setDurationOverride(int seconds) {
+        this.durationOverride = seconds;
+        // Update synched tick count immediately if entity data is already initialised
+        int ticks = (seconds < 0) ? -1 : (seconds * 20);
+        this.entityData.set(TICK_COUNT_REMAINING, ticks);
+    }
+
+    /** Override whether XP cost is enabled for this domain. */
+    public void setCostOverride(boolean enabled) {
+        this.costOverride = enabled;
+        this.hasCostOverride = true;
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(OWNER_ID, Optional.empty());
         builder.define(MAID_ID, Optional.empty());
-        builder.define(TICK_COUNT_REMAINING, Config.DOMAIN_EXPANSION_DURATION_SECONDS.get() * 20);
+        int durationSeconds = Config.DOMAIN_EXPANSION_DURATION_SECONDS.get();
+        int ticksRemaining = (durationSeconds < 0) ? -1 : (durationSeconds * 20);
+        builder.define(TICK_COUNT_REMAINING, ticksRemaining);
     }
 
     @Override
@@ -94,6 +121,14 @@ public class DomainExpansionEntity extends Entity {
             setMaidId(compound.getUUID("MaidId"));
         this.entityData.set(TICK_COUNT_REMAINING, compound.getInt("RemainingTicks"));
         this.initialized = compound.getBoolean("Initialized");
+        if (compound.contains("StructureOverride"))
+            this.structureOverride = compound.getString("StructureOverride");
+        if (compound.contains("DurationOverride"))
+            this.durationOverride = compound.getInt("DurationOverride");
+        if (compound.contains("CostOverride")) {
+            this.costOverride = compound.getBoolean("CostOverride");
+            this.hasCostOverride = true;
+        }
 
         if (compound.contains("SavedBlocks")) {
             ListTag blockList = compound.getList("SavedBlocks", 10);
@@ -130,6 +165,12 @@ public class DomainExpansionEntity extends Entity {
             compound.putUUID("MaidId", getMaidId());
         compound.putInt("RemainingTicks", this.entityData.get(TICK_COUNT_REMAINING));
         compound.putBoolean("Initialized", this.initialized);
+        if (structureOverride != null)
+            compound.putString("StructureOverride", structureOverride);
+        if (durationOverride != -2)
+            compound.putInt("DurationOverride", durationOverride);
+        if (hasCostOverride)
+            compound.putBoolean("CostOverride", costOverride);
 
         ListTag blockList = new ListTag();
         for (Map.Entry<BlockPos, BlockState> entry : savedBlocks.entrySet()) {
@@ -171,15 +212,23 @@ public class DomainExpansionEntity extends Entity {
         }
 
         int remaining = this.entityData.get(TICK_COUNT_REMAINING);
-        if (remaining <= 0) {
-            restoreDomain();
-            this.discard();
-            return;
+        boolean infinite = (remaining < 0);
+
+        if (!infinite) {
+            if (remaining == 0) {
+                restoreDomain();
+                this.discard();
+                return;
+            }
+            this.entityData.set(TICK_COUNT_REMAINING, remaining - 1);
         }
-        this.entityData.set(TICK_COUNT_REMAINING, remaining - 1);
-        
+
+        // Use tickCount for periodic work so infinite mode still applies effects
+        int periodicTick = this.tickCount;
+
         boolean canSustain = true;
-        if (Config.DOMAIN_EXPANSION_XP_COST_ENABLED.get() && getOwnerId() != null) {
+        boolean xpCostEnabled = hasCostOverride ? costOverride : Config.DOMAIN_EXPANSION_XP_COST_ENABLED.get();
+        if (xpCostEnabled && getOwnerId() != null) {
             Player owner = serverLevel.getServer().getPlayerList().getPlayer(getOwnerId());
             if (owner != null) {
                 int cost = Config.DOMAIN_EXPANSION_XP_COST.get();
@@ -187,7 +236,7 @@ public class DomainExpansionEntity extends Entity {
                     int intervalTicks = Config.DOMAIN_EXPANSION_XP_COST_INTERVAL_SECONDS.get() * 20;
                     if (owner.experienceLevel < cost) {
                         canSustain = false;
-                    } else if (remaining % intervalTicks == 0) {
+                    } else if (periodicTick % intervalTicks == 0) {
                         owner.giveExperienceLevels(-cost);
                     }
                 }
@@ -195,19 +244,19 @@ public class DomainExpansionEntity extends Entity {
                 canSustain = false;
             }
         }
-        
+
         if (!canSustain) {
             restoreDomain();
             this.discard();
             return;
         }
 
-        if (remaining % 20 == 0) {
+        if (periodicTick % 20 == 0) {
             applyEffects();
         }
 
         // Apply maid light independently of entity protection
-        if (remaining % 20 == 0) {
+        if (periodicTick % 20 == 0) {
             applyMaidLight(serverLevel);
         }
 
@@ -241,17 +290,19 @@ public class DomainExpansionEntity extends Entity {
                     continue;
                 maidsInRange.add(maid.getUUID());
                 BlockPos newLightPos = maid.blockPosition().above();
-                BlockPos lastLightPos = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
-                // Always remove old light first if maid has moved
-                if (lastLightPos != null && !lastLightPos.equals(newLightPos)
-                        && serverLevel.getBlockState(lastLightPos).is(Blocks.LIGHT)) {
-                    serverLevel.setBlockAndUpdate(lastLightPos, Blocks.AIR.defaultBlockState());
+                Touhoulittlemaidpersonaldimension.MaidLightEntry lastEntry =
+                        Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
+                BlockPos lastLightPos = lastEntry != null ? lastEntry.pos() : null;
+                // Always remove old light first if maid has moved (uses right level via entry)
+                if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+                    Touhoulittlemaidpersonaldimension.removeMaidLight(maid.getUUID(), serverLevel.getServer());
                 }
                 // Place new light if spot is free
                 BlockState atNew = serverLevel.getBlockState(newLightPos);
                 if (atNew.isAir() || atNew.is(Blocks.LIGHT)) {
                     serverLevel.setBlockAndUpdate(newLightPos, Blocks.LIGHT.defaultBlockState());
-                    Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
+                    Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(),
+                            new Touhoulittlemaidpersonaldimension.MaidLightEntry(newLightPos, serverLevel.dimension()));
                 } else if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
                     // Can't place at new pos, but maid has moved — remove from map
                     Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maid.getUUID());
@@ -259,12 +310,15 @@ public class DomainExpansionEntity extends Entity {
             }
         }
 
-        // Clean up lights for maids no longer in range or when setting is off
+        // Clean up lights for maids no longer in range or when setting is off.
+        // IMPORTANT: use entry.dimension() to get the right ServerLevel — do NOT use
+        // serverLevel directly, the light may have been placed in a different dimension.
         Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
             if (!maidsInRange.contains(entry.getKey())) {
-                BlockPos lp = entry.getValue();
-                if (serverLevel.getBlockState(lp).is(Blocks.LIGHT)) {
-                    serverLevel.setBlockAndUpdate(lp, Blocks.AIR.defaultBlockState());
+                Touhoulittlemaidpersonaldimension.MaidLightEntry lightEntry = entry.getValue();
+                ServerLevel lightLevel = serverLevel.getServer().getLevel(lightEntry.dimension());
+                if (lightLevel != null && lightLevel.getBlockState(lightEntry.pos()).is(Blocks.LIGHT)) {
+                    lightLevel.setBlockAndUpdate(lightEntry.pos(), Blocks.AIR.defaultBlockState());
                 }
                 return true;
             }
@@ -274,6 +328,20 @@ public class DomainExpansionEntity extends Entity {
 
     public net.minecraft.world.phys.AABB getStructureAABB() {
         return structureAABB;
+    }
+
+    /** Returns the effective structure name used by this domain (override or config). */
+    public String getActiveStructureName() {
+        if (structureOverride != null && !structureOverride.isEmpty()) return structureOverride;
+        return com.tlmpersonal.tlmpersonaldimension.Config.DOMAIN_EXPANSION_STRUCTURE.get();
+    }
+
+    /** Public entry point so commands can cleanly collapse a domain. */
+    public void callRestoreAndDiscard() {
+        if (!this.level().isClientSide) {
+            restoreDomain();
+            this.discard();
+        }
     }
 
     public boolean isUsingDimensionRules() {
@@ -387,7 +455,9 @@ public class DomainExpansionEntity extends Entity {
         StructureTemplateManager templateManager = serverLevel.getServer().getStructureManager();
         
         // Parse the structure config to support both simple names and full namespaced paths
-        String structureConfig = Config.DOMAIN_EXPANSION_STRUCTURE.get().trim();
+        String structureConfig = (structureOverride != null && !structureOverride.isEmpty())
+                ? structureOverride
+                : Config.DOMAIN_EXPANSION_STRUCTURE.get().trim();
         ResourceLocation structureLocation;
         
         try {
@@ -486,7 +556,9 @@ public class DomainExpansionEntity extends Entity {
                     structurePos.getZ() + size.getZ());
 
             // Only teleport entities to the ground for my_island structure
-            if (Config.DOMAIN_EXPANSION_STRUCTURE.get().equals("my_island")) {
+            String resolvedStructure = (structureOverride != null && !structureOverride.isEmpty())
+                    ? structureOverride : Config.DOMAIN_EXPANSION_STRUCTURE.get();
+            if (resolvedStructure.equals("my_island")) {
                 // Teleport entities in the structure area down to the ground of the domain (25 blocks above structurePos Y)
                 double groundY = structurePos.getY() + 25.0 + 1.0;
                 for (Entity e : serverLevel.getEntities(this, structureAABB)) {
@@ -606,11 +678,12 @@ public class DomainExpansionEntity extends Entity {
             }
         }
 
-        // Clean up any maid light blocks left by this domain
+        // Clean up any maid light blocks left by this domain (uses correct level per entry)
         Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
-            BlockPos lp = entry.getValue();
-            if (serverLevel.getBlockState(lp).is(Blocks.LIGHT)) {
-                serverLevel.setBlockAndUpdate(lp, Blocks.AIR.defaultBlockState());
+            Touhoulittlemaidpersonaldimension.MaidLightEntry lightEntry = entry.getValue();
+            ServerLevel lightLevel = serverLevel.getServer().getLevel(lightEntry.dimension());
+            if (lightLevel != null && lightLevel.getBlockState(lightEntry.pos()).is(Blocks.LIGHT)) {
+                lightLevel.setBlockAndUpdate(lightEntry.pos(), Blocks.AIR.defaultBlockState());
             }
             return true;
         });

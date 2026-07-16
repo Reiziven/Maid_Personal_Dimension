@@ -412,7 +412,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .defineInRange("domainExpansionCooldownSeconds", 300, 0, 1000000);
                 DOMAIN_EXPANSION_DURATION_SECONDS = BUILDER
                                 .comment("How long (in seconds) the domain expansion lasts before collapsing.")
-                                .defineInRange("domainExpansionDurationSeconds", 60, -1, 3600);
+                                .defineInRange("domainExpansionDurationSeconds", 60, -1, 36000000);
                 DOMAIN_EXPANSION_XP_COST_ENABLED = BUILDER
                                 .comment("If true, Domain Expansion consumes XP levels from its owner over time.")
                                 .define("domainExpansionXpCostEnabled", true);

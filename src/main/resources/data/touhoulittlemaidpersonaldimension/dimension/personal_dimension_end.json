@@ -1,5 +1,5 @@
 {
-  "type": "touhoulittlemaidpersonaldimension:personal_dimension",
+  "type": "touhoulittlemaidpersonaldimension:personal_dimension_end",
   "generator": {
     "type": "minecraft:noise",
     "settings": "minecraft:end",

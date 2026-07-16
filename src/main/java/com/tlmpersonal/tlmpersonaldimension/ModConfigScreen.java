@@ -477,8 +477,8 @@ public class ModConfigScreen {
                 Config.DOMAIN_EXPANSION_DURATION_SECONDS.get())
                 .setDefaultValue(60)
                 .setMin(-1)
-                .setMax(3600)
-                .setTooltip(Component.literal("How long (in seconds) the domain expansion lasts before collapsing."))
+                .setMax(36000000)
+                .setTooltip(Component.literal("How long (in seconds) the domain expansion lasts before collapsing. Use -1 for infinite duration."))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_DURATION_SECONDS::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
