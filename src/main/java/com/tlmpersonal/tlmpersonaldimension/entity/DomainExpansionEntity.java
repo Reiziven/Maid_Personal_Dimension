@@ -242,14 +242,19 @@ public class DomainExpansionEntity extends Entity {
                 maidsInRange.add(maid.getUUID());
                 BlockPos newLightPos = maid.blockPosition().above();
                 BlockPos lastLightPos = Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
+                // Always remove old light first if maid has moved
+                if (lastLightPos != null && !lastLightPos.equals(newLightPos)
+                        && serverLevel.getBlockState(lastLightPos).is(Blocks.LIGHT)) {
+                    serverLevel.setBlockAndUpdate(lastLightPos, Blocks.AIR.defaultBlockState());
+                }
+                // Place new light if spot is free
                 BlockState atNew = serverLevel.getBlockState(newLightPos);
                 if (atNew.isAir() || atNew.is(Blocks.LIGHT)) {
                     serverLevel.setBlockAndUpdate(newLightPos, Blocks.LIGHT.defaultBlockState());
                     Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
-                }
-                if (lastLightPos != null && !lastLightPos.equals(newLightPos)
-                        && serverLevel.getBlockState(lastLightPos).is(Blocks.LIGHT)) {
-                    serverLevel.setBlockAndUpdate(lastLightPos, Blocks.AIR.defaultBlockState());
+                } else if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+                    // Can't place at new pos, but maid has moved — remove from map
+                    Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.remove(maid.getUUID());
                 }
             }
         }
@@ -600,5 +605,14 @@ public class DomainExpansionEntity extends Entity {
                 e.teleportTo(pos.x, pos.y, pos.z);
             }
         }
+
+        // Clean up any maid light blocks left by this domain
+        Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
+            BlockPos lp = entry.getValue();
+            if (serverLevel.getBlockState(lp).is(Blocks.LIGHT)) {
+                serverLevel.setBlockAndUpdate(lp, Blocks.AIR.defaultBlockState());
+            }
+            return true;
+        });
     }
 }

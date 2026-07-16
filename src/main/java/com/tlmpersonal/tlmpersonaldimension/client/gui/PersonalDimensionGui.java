@@ -2,6 +2,7 @@ package com.tlmpersonal.tlmpersonaldimension.client.gui;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.tlmpersonal.tlmpersonaldimension.Config;
+import com.tlmpersonal.tlmpersonaldimension.CustomDimensionConfig;
 import com.tlmpersonal.tlmpersonaldimension.PersonalDimensionSavedData;
 import com.tlmpersonal.tlmpersonaldimension.TouhoulittlemaidpersonaldimensionClient;
 import com.tlmpersonal.tlmpersonaldimension.network.PersonalDimensionGuiPacket;
@@ -255,26 +256,50 @@ public class PersonalDimensionGui extends Screen {
                     })
                     .build());
             y += 25;
-            Config.DimensionType currentType = localSettings != null && localSettings.getDimensionType() != null ? localSettings.getDimensionType() : Config.DIMENSION_TYPE.get();
-            String displayDim = switch (currentType) {
-                case VOID -> "MAID ISLAND";
-                case NORMAL -> "OVERWORLD";
-                case CHERRY -> "CHERRY";
-            };
+            
+            // Load available dimensions
+            List<CustomDimensionConfig> availableDimensions = CustomDimensionConfig.loadFromConfig();
+            
+            String currentDimId = localSettings != null ? localSettings.getDimensionTypeId() : null;
+            if (currentDimId == null || currentDimId.isEmpty()) {
+                currentDimId = availableDimensions.isEmpty() ? "void" : availableDimensions.get(0).getId();
+            }
+            
+            // Make effectively final for lambda
+            final String finalCurrentDimId = currentDimId;
+            
+            CustomDimensionConfig currentDim = CustomDimensionConfig.findById(finalCurrentDimId, availableDimensions);
+            String displayDim = currentDim != null ? currentDim.getDisplayName() : finalCurrentDimId.toUpperCase();
             
             addScrollingWidget(Button.builder(Component.literal("Dim: " + displayDim), button -> {
-                Config.DimensionType next = Config.DimensionType.values()[(currentType.ordinal() + 1) % Config.DimensionType.values().length];
-                if (localSettings != null) localSettings.setDimensionType(next);
-                sendPacket(PersonalDimensionGuiPacket.Action.SET_DIMENSION_TYPE, next.name());
-                String nextDisplay = switch (next) {
-                    case VOID -> "MAID ISLAND";
-                    case NORMAL -> "OVERWORLD";
-                    case CHERRY -> "CHERRY";
-                };
-                button.setMessage(Component.literal("Dim: " + nextDisplay));
+                // Find current dimension index
+                int currentIndex = -1;
+                for (int i = 0; i < availableDimensions.size(); i++) {
+                    if (availableDimensions.get(i).getId().equals(finalCurrentDimId)) {
+                        currentIndex = i;
+                        break;
+                    }
+                }
+                
+                // Get next dimension (cycle through list)
+                int nextIndex = (currentIndex + 1) % availableDimensions.size();
+                CustomDimensionConfig nextDim = availableDimensions.get(nextIndex);
+                
+                if (localSettings != null) localSettings.setDimensionTypeId(nextDim.getId());
+                sendPacket(PersonalDimensionGuiPacket.Action.SET_DIMENSION_TYPE, nextDim.getId());
+                
+                button.setMessage(Component.literal("Dim: " + nextDim.getDisplayName()));
             }).bounds(centerX + 10, y, 140, 20).build());
 
-            y += 25;
+            y += 22;
+            // Warn user that new dimension types added to config require a world restart to be available
+            Button dimWarning = Button.builder(
+                    Component.literal("§e⚠ New dim types need world restart"),
+                    b -> {}).bounds(centerX + 10, y, 210, 14).build();
+            dimWarning.active = false;
+            addScrollingWidget(dimWarning);
+
+            y += 18;
 
             addScrollingWidget(Checkbox.builder(Component.literal("Lock Day"), this.font)
                     .pos(centerX + 10, y)

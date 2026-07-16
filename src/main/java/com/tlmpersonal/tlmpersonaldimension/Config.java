@@ -15,6 +15,7 @@ public class Config {
                 CHERRY
         }
 
+        // Legacy - kept for compatibility, not used anymore
         public static final ModConfigSpec.EnumValue<DimensionType> DIMENSION_TYPE;
         public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURES;
         public static final ModConfigSpec.ConfigValue<List<? extends String>> STRUCTURE_WHITELIST;
@@ -164,9 +165,16 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_ATTACK_SPEED;
         public static final ModConfigSpec.DoubleValue CAT_FAMILIAR_ATTACK_RANGE_BONUS;
 
+        // Custom Dimension Templates
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_DIMENSION_TEMPLATES;
+        public static final ModConfigSpec.ConfigValue<String> DEFAULT_DIMENSION_TYPE_ID;
+
         static {
                 BUILDER.push("General Settings");
-                DIMENSION_TYPE = BUILDER.defineEnum("dimensionType", DimensionType.VOID);
+                // Legacy dimension type - deprecated in favor of customDimensionTemplates
+                DIMENSION_TYPE = BUILDER
+                        .comment("DEPRECATED: Use customDimensionTemplates instead. This is kept for backward compatibility only.")
+                        .defineEnum("dimensionType", DimensionType.VOID);
                 ENABLE_STRUCTURES = BUILDER
                                 .comment("If true, all structures generate normally in the personal dimension. If false, only structures in structureWhitelist will generate.")
                                 .define("enableStructures", false);
@@ -537,6 +545,43 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         BUILDER.pop();
                 
                 BUILDER.pop(); // End Bauble Configuration
+
+                BUILDER.push("Custom Dimension Templates");
+                CUSTOM_DIMENSION_TEMPLATES = BUILDER
+                        .comment(
+                                "List of custom dimension templates players can choose from.",
+                                "Format: \"id|display_name|template_dimension_key\"",
+                                "Example: \"void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension\"",
+                                "The template_dimension_key references a dimension definition in data/*/dimension/ folder.",
+                                "These dimension files define the world generation settings (biomes, structures, etc).",
+                                "To add a custom dimension:",
+                                "  1. Create a dimension JSON file (see existing examples in mod resources)",
+                                "  2. Configure the generator to use vanilla or custom settings",
+                                "  3. Add an entry here: \"custom_id|DISPLAY NAME|yourmod:yourdimension\"",
+                                "  4. Players can then select it via GUI",
+                                "NOTE: New dimension types added here require a full game restart to take effect.",
+                                "      You can change dimension type in the Maid GUI (4th tab, requires favorability 3),",
+                                "      or set the default for all new players using defaultDimensionTypeId below."
+                        )
+                        .defineList("customDimensionTemplates",
+                                () -> List.of(
+                                        "void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension",
+                                        "normal|OVERWORLD|touhoulittlemaidpersonaldimension:personal_dimension_normal",
+                                        "cherry|CHERRY GROVE|touhoulittlemaidpersonaldimension:personal_dimension_cherry",
+                                        "nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether",
+                                        "end|THE END|touhoulittlemaidpersonaldimension:personal_dimension_end"
+                                ),
+                                o -> o instanceof String);
+                DEFAULT_DIMENSION_TYPE_ID = BUILDER
+                        .comment(
+                                "The default dimension type ID assigned to new players (and shared dimension when privateDimension=false).",
+                                "Must match one of the IDs defined in customDimensionTemplates (the first part before '|').",
+                                "Example: \"void\", \"normal\", \"cherry\", \"nether\", \"end\"",
+                                "Players can still change their own type via the Maid GUI (4th tab, favorability level 3 required).",
+                                "NOTE: Changing this does not affect players who already have a dimension assigned."
+                        )
+                        .define("defaultDimensionTypeId", "void");
+                BUILDER.pop();
         }
 
         public static final ModConfigSpec SPEC = BUILDER.build();

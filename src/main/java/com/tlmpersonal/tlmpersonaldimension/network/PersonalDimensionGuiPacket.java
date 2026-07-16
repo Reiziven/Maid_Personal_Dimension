@@ -487,19 +487,13 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         break;
 
                     case SET_DIMENSION_TYPE: {
-                        try {
-                            Config.DimensionType type = Config.DimensionType.valueOf(message.data());
-                            settings.setDimensionType(type);
+                        String dimensionTypeId = message.data().trim();
+                        if (!dimensionTypeId.isEmpty()) {
+                            settings.setDimensionTypeId(dimensionTypeId);
                             savedData.setDirty();
                             syncSettings(sender, settings);
-                            String typeNameKey = switch (type) {
-                                case VOID -> "gui.tlmpersonaldimension.dim_type.void";
-                                case NORMAL -> "gui.tlmpersonaldimension.dim_type.normal";
-                                case CHERRY -> "gui.tlmpersonaldimension.dim_type.cherry";
-                            };
                             sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.dim_type_set",
-                                    Component.translatable(typeNameKey)));
-                        } catch (Exception ignored) {
+                                    Component.literal(dimensionTypeId.toUpperCase())));
                         }
                     }
                         break;

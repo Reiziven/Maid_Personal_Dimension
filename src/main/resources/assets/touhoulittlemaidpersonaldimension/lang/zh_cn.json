@@ -110,6 +110,11 @@
   "message.tlmpersonaldimension.dim_type_set": "维度类型已设置为: %s。再次传送以进入新世界。",
   "tooltip.tlmpersonaldimension.owner": "所有者: %s",
 
+  "config.tlmpersonaldimension.custom_dimensions.title": "自定义维度模板",
+  "config.tlmpersonaldimension.custom_dimensions.tooltip": "配置额外的维度类型。格式：id|显示名称|模板维度键",
+  "message.tlmpersonaldimension.dimension_load_failed": "加载维度 '%s' 失败。请检查您的配置。",
+  "message.tlmpersonaldimension.dimension_not_found": "未找到维度类型 '%s'。使用默认维度。",
+
   "tooltip.cat_familiar_bauble.hint": "§7按住 §6[SHIFT]§7 查看能力详情",
 
   "tooltip.domain_expansion_bauble.hint": "§7按住 §6[SHIFT]§7 查看能力详情",

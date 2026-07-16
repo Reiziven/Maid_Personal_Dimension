@@ -19,19 +19,6 @@ public class ModConfigScreen {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         ConfigCategory general = builder.getOrCreateCategory(Component.literal("General Settings"));
-        general.addEntry(entryBuilder.startEnumSelector(
-                Component.literal("Dimension Type"),
-                Config.DimensionType.class,
-                Config.DIMENSION_TYPE.get())
-                .setEnumNameProvider(en -> switch ((Config.DimensionType) en) {
-                    case VOID -> Component.literal("MAID ISLAND");
-                    case NORMAL -> Component.literal("OVERWORLD");
-                    case CHERRY -> Component.literal("CHERRY");
-                })
-                .setDefaultValue(Config.DimensionType.VOID)
-                .setTooltip(Component.literal("MAID ISLAND (Island only), OVERWORLD (World gen), CHERRY (Grove only)"))
-                .setSaveConsumer(Config.DIMENSION_TYPE::set)
-                .build());
         general.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Enable Structures"),
                 Config.ENABLE_STRUCTURES.get())
@@ -826,6 +813,45 @@ public class ModConfigScreen {
                 .setDefaultValue(true)
                 .setTooltip(Component.literal("If false, the Cat Familiar Bauble cannot be crafted at the altar. Still obtainable via commands."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_BAUBLE_CRAFTABLE::set)
+                .build());
+
+        ConfigCategory customDimensions = builder.getOrCreateCategory(Component.literal("Custom Dimensions"));
+        customDimensions.addEntry(entryBuilder.startTextDescription(
+                Component.literal("§eDimension type can also be changed per-player in the Maid GUI (4th tab, favorability level 3 required)."))
+                .build());
+        customDimensions.addEntry(entryBuilder.startTextDescription(
+                Component.literal("§c⚠ New dimension types added here require a full game restart to take effect."))
+                .build());
+        customDimensions.addEntry(entryBuilder.startStrField(
+                Component.literal("Default Dimension Type ID"),
+                Config.DEFAULT_DIMENSION_TYPE_ID.get())
+                .setDefaultValue("void")
+                .setTooltip(Component.literal(
+                        "The dimension type assigned to new players by default.\n" +
+                        "Must match an ID from the list below (the part before the first '|').\n" +
+                        "Example: void, normal, cherry, nether, end\n" +
+                        "Players can still override this in the Maid GUI."))
+                .setSaveConsumer(Config.DEFAULT_DIMENSION_TYPE_ID::set)
+                .build());
+        customDimensions.addEntry(entryBuilder.startStrList(
+                Component.literal("Custom Dimension Templates"),
+                new ArrayList<>(Config.CUSTOM_DIMENSION_TEMPLATES.get()))
+                .setDefaultValue(List.of(
+                        "void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension",
+                        "normal|OVERWORLD|touhoulittlemaidpersonaldimension:personal_dimension_normal",
+                        "cherry|CHERRY GROVE|touhoulittlemaidpersonaldimension:personal_dimension_cherry",
+                        "nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether",
+                        "end|THE END|touhoulittlemaidpersonaldimension:personal_dimension_end"
+                ))
+                .setTooltip(Component.literal(
+                        "List of dimension templates players can choose from.\n" +
+                        "Format: \"id|display_name|template_dimension_key\"\n" +
+                        "  id          - short unique name, lowercase, no spaces (e.g. void, nether)\n" +
+                        "  display_name - shown in Maid GUI (e.g. MAID ISLAND)\n" +
+                        "  template_key - dimension file to copy settings from\n" +
+                        "Example: \"nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether\"\n" +
+                        "WARNING: Requires full game restart after adding new entries."))
+                .setSaveConsumer(Config.CUSTOM_DIMENSION_TEMPLATES::set)
                 .build());
 
         return builder.build();

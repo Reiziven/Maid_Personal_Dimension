@@ -110,6 +110,11 @@
   "message.tlmpersonaldimension.dim_type_set": "Dimension type set to: %s. Teleport again to enter the new world.",
   "tooltip.tlmpersonaldimension.owner": "Owner: %s",
 
+  "config.tlmpersonaldimension.custom_dimensions.title": "Custom Dimension Templates",
+  "config.tlmpersonaldimension.custom_dimensions.tooltip": "Configure additional dimension types. Format: id|display_name|template_dimension_key",
+  "message.tlmpersonaldimension.dimension_load_failed": "Failed to load dimension '%s'. Please check your configuration.",
+  "message.tlmpersonaldimension.dimension_not_found": "Dimension type '%s' not found. Using default dimension.",
+
   "tooltip.cat_familiar_bauble.hint": "§7Hold §6[SHIFT]§7 to reveal abilities",
 
   "tooltip.domain_expansion_bauble.hint": "§7Hold §6[SHIFT]§7 to reveal abilities",
