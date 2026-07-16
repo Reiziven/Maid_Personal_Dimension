@@ -963,16 +963,21 @@ public class Touhoulittlemaidpersonaldimension {
                     activeMaidUUIDs.add(maid.getUUID());
                     BlockPos newLightPos = maid.blockPosition().above();
                     BlockPos lastLightPos = MAID_LIGHT_POSITIONS.get(maid.getUUID());
+                    // Always remove the old light first if maid has moved
+                    if (lastLightPos != null && !lastLightPos.equals(newLightPos)
+                            && level.getBlockState(lastLightPos).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+                        level.setBlockAndUpdate(lastLightPos,
+                                net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    }
+                    // Place new light if spot is free
                     net.minecraft.world.level.block.state.BlockState atNew = level.getBlockState(newLightPos);
                     if (atNew.isAir() || atNew.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
                         level.setBlockAndUpdate(newLightPos,
                                 net.minecraft.world.level.block.Blocks.LIGHT.defaultBlockState());
                         MAID_LIGHT_POSITIONS.put(maid.getUUID(), newLightPos);
-                    }
-                    if (lastLightPos != null && !lastLightPos.equals(newLightPos)
-                            && level.getBlockState(lastLightPos).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
-                        level.setBlockAndUpdate(lastLightPos,
-                                net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    } else if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+                        // Can't place at new pos, but maid has moved — remove from map
+                        MAID_LIGHT_POSITIONS.remove(maid.getUUID());
                     }
                 }
             }
