@@ -7,6 +7,8 @@ import com.tlmpersonal.tlmpersonaldimension.PersonalLevelStateData;
 import com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension;
 import com.tlmpersonal.tlmpersonaldimension.accessor.MinecraftServerAccessor;
 import com.tlmpersonal.tlmpersonaldimension.worldgen.accessor.ChunkGeneratorAccessor;
+import net.minecraft.core.Holder;
+import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -17,6 +19,7 @@ import net.minecraft.util.thread.ReentrantBlockableEventLoop;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.ServerLevelData;
@@ -71,6 +74,11 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
                 return false;
             }
 
+            // Use the template's DimensionType directly so the client receives the correct
+            // effects (sky, fog, etc.) via the respawn packet — works generically for any template.
+            Holder<DimensionType> dimensionTypeHolder = templateStem.type();
+            LevelStem stemForNewLevel = new LevelStem(dimensionTypeHolder, templateStem.generator());
+
             ServerLevel overworld = levels.get(Level.OVERWORLD);
             if (overworld == null) {
                 Touhoulittlemaidpersonaldimension.LOGGER.error("Overworld not found, cannot create dimension");
@@ -103,7 +111,7 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
                     storageSource,
                     personalLevelData,
                     key,
-                    templateStem,
+                    stemForNewLevel,
                     progressListener,
                     overworld.isDebug(),
                     seed,

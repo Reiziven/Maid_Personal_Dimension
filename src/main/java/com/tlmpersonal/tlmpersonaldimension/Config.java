@@ -15,6 +15,7 @@ public class Config {
                 CHERRY
         }
 
+        // Legacy - kept for compatibility, not used anymore
         public static final ModConfigSpec.EnumValue<DimensionType> DIMENSION_TYPE;
         public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURES;
         public static final ModConfigSpec.ConfigValue<List<? extends String>> STRUCTURE_WHITELIST;
@@ -125,6 +126,8 @@ public class Config {
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_USE_ENTITY_PROTECTION;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_USE_ENTITY_FILTERING;
         public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_AFFECTS_OWNER;
+        public static final ModConfigSpec.BooleanValue DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST;
+        public static final ModConfigSpec.BooleanValue CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST;
 public static final ModConfigSpec.IntValue CHERRY_DOMAIN_HORIZONTAL_RADIUS;
 public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.IntValue CHERRY_DOMAIN_RULES_BYPASS_CHANCE;
@@ -164,9 +167,19 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         public static final ModConfigSpec.BooleanValue CAT_FAMILIAR_MIRROR_ATTACK_SPEED;
         public static final ModConfigSpec.DoubleValue CAT_FAMILIAR_ATTACK_RANGE_BONUS;
 
+        // Mod Blocklist
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> MOD_BLOCKLIST;
+
+        // Custom Dimension Templates
+        public static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_DIMENSION_TEMPLATES;
+        public static final ModConfigSpec.ConfigValue<String> DEFAULT_DIMENSION_TYPE_ID;
+
         static {
                 BUILDER.push("General Settings");
-                DIMENSION_TYPE = BUILDER.defineEnum("dimensionType", DimensionType.VOID);
+                // Legacy dimension type - deprecated in favor of customDimensionTemplates
+                DIMENSION_TYPE = BUILDER
+                        .comment("DEPRECATED: Use customDimensionTemplates instead. This is kept for backward compatibility only.")
+                        .defineEnum("dimensionType", DimensionType.VOID);
                 ENABLE_STRUCTURES = BUILDER
                                 .comment("If true, all structures generate normally in the personal dimension. If false, only structures in structureWhitelist will generate.")
                                 .define("enableStructures", false);
@@ -404,7 +417,7 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                                 .defineInRange("domainExpansionCooldownSeconds", 300, 0, 1000000);
                 DOMAIN_EXPANSION_DURATION_SECONDS = BUILDER
                                 .comment("How long (in seconds) the domain expansion lasts before collapsing.")
-                                .defineInRange("domainExpansionDurationSeconds", 60, -1, 3600);
+                                .defineInRange("domainExpansionDurationSeconds", 60, -1, 36000000);
                 DOMAIN_EXPANSION_XP_COST_ENABLED = BUILDER
                                 .comment("If true, Domain Expansion consumes XP levels from its owner over time.")
                                 .define("domainExpansionXpCostEnabled", true);
@@ -435,6 +448,12 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                 CHERRY_DOMAIN_AFFECTS_OWNER = BUILDER
                         .comment("If true, the Cherry Domain Bauble also creates an aura around the owner.")
                         .define("cherryDomainAffectsOwner", false);
+                DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST = BUILDER
+                        .comment("If true, mod blocklist effects like Porky's fear suppression also apply inside Domain Expansion areas.")
+                        .define("domainExpansionAffectedByBlocklist", false);
+                CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST = BUILDER
+                        .comment("If true, mod blocklist effects like Porky's fear suppression also apply inside Cherry Domain areas.")
+                        .define("cherryDomainAffectedByBlocklist", false);
                 CHERRY_DOMAIN_HORIZONTAL_RADIUS = BUILDER
                         .comment("Horizontal radius for Cherry Domain block placement (half width). 2 gives a 5x5 area. NOTE tat high value can cause lag")
                         .defineInRange("cherryDomainHorizontalRadius", 10, 0, 100);
@@ -537,6 +556,54 @@ public static final ModConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
         BUILDER.pop();
                 
                 BUILDER.pop(); // End Bauble Configuration
+
+                BUILDER.push("Mod Blocklist");
+                MOD_BLOCKLIST = BUILDER
+                        .comment(
+                                "List of mod IDs whose entities, blocks, and items are completely blocked inside the personal dimension.",
+                                "Entities from blocked mods are removed/prevented from spawning.",
+                                "Example: [\"somebigmod\", \"anotherbadmod\"]",
+                                "Use the mod's namespace/mod ID (the part before ':' in registry names)."
+                        )
+                        .defineList("modBlocklist", ArrayList::new, o -> o instanceof String);
+                BUILDER.pop();
+
+                BUILDER.push("Custom Dimension Templates");
+                CUSTOM_DIMENSION_TEMPLATES = BUILDER
+                        .comment(
+                                "List of custom dimension templates players can choose from.",
+                                "Format: \"id|display_name|template_dimension_key\"",
+                                "Example: \"void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension\"",
+                                "The template_dimension_key references a dimension definition in data/*/dimension/ folder.",
+                                "These dimension files define the world generation settings (biomes, structures, etc).",
+                                "To add a custom dimension:",
+                                "  1. Create a dimension JSON file (see existing examples in mod resources)",
+                                "  2. Configure the generator to use vanilla or custom settings",
+                                "  3. Add an entry here: \"custom_id|DISPLAY NAME|yourmod:yourdimension\"",
+                                "  4. Players can then select it via GUI",
+                                "NOTE: New dimension types added here require a full game restart to take effect.",
+                                "      You can change dimension type in the Maid GUI (4th tab, requires favorability 3),",
+                                "      or set the default for all new players using defaultDimensionTypeId below."
+                        )
+                        .defineList("customDimensionTemplates",
+                                () -> List.of(
+                                        "void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension",
+                                        "normal|OVERWORLD|touhoulittlemaidpersonaldimension:personal_dimension_normal",
+                                        "cherry|CHERRY GROVE|touhoulittlemaidpersonaldimension:personal_dimension_cherry",
+                                        "nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether",
+                                        "end|THE END|touhoulittlemaidpersonaldimension:personal_dimension_end"
+                                ),
+                                o -> o instanceof String);
+                DEFAULT_DIMENSION_TYPE_ID = BUILDER
+                        .comment(
+                                "The default dimension type ID assigned to new players (and shared dimension when privateDimension=false).",
+                                "Must match one of the IDs defined in customDimensionTemplates (the first part before '|').",
+                                "Example: \"void\", \"normal\", \"cherry\", \"nether\", \"end\"",
+                                "Players can still change their own type via the Maid GUI (4th tab, favorability level 3 required).",
+                                "NOTE: Changing this does not affect players who already have a dimension assigned."
+                        )
+                        .define("defaultDimensionTypeId", "void");
+                BUILDER.pop();
         }
 
         public static final ModConfigSpec SPEC = BUILDER.build();

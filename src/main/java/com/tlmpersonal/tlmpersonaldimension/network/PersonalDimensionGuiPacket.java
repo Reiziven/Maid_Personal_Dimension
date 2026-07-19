@@ -231,9 +231,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         boolean canChange = Config.ALLOW_CHEAT_CONFIGS.get() || Config.ALLOW_ALLOW_ALL_ENTITIES.get();
                         if (canChange) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.ALLOW_ALL_COST_POWER_POINTS.get(),
-                                    Config.ALLOW_ALL_COST_XP.get(), true)) {
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.ALLOW_ALL_COST_POWER_POINTS.get(),
+                                    Config.ALLOW_ALL_COST_XP.get(), !alreadyUnlocked)) {
                                 settings.setAllowAllEntities(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -244,9 +247,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_DISABLE_HOSTILE_ENTITIES: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DISABLE_HOSTILE_COST_POWER_POINTS.get(),
-                                    Config.DISABLE_HOSTILE_COST_XP.get(), true)) {
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DISABLE_HOSTILE_COST_POWER_POINTS.get(),
+                                    Config.DISABLE_HOSTILE_COST_XP.get(), false)) {
                                 settings.setDisableHostileEntities(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -257,9 +263,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_DISABLE_HUNGER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -269,9 +278,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_DISABLE_MAID_DEATH: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -281,9 +293,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_DISABLE_PLAYER_DEATH: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -293,9 +308,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_NATURAL_HEALING: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -305,9 +323,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_BLOCK_HARMFUL_EFFECTS: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -317,9 +338,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_MAID_EMIT_LIGHT: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -330,9 +354,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_LOCK_DAY: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockDay(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 ServerLevel personalDim = PlayerDimensionManager
@@ -348,9 +375,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             try {
                                 int time = Integer.parseInt(message.data());
-                                if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                                String ruleKey = message.action().name();
+                                boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                                if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                         Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                     settings.setLockedDayTime(time);
+                                    settings.unlockRule(ruleKey);
                                     savedData.setDirty();
                                     syncSettings(sender, settings);
                                     if (settings.isLockDay()) {
@@ -369,9 +399,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_LOCK_WEATHER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockWeather(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (value) {
@@ -389,9 +422,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_LOCKED_WEATHER_RAIN: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockedWeatherRain(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (settings.isLockWeather()) {
@@ -408,9 +444,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_LOCKED_WEATHER_THUNDER: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 settings.setLockedWeatherThunder(value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                                 if (settings.isLockWeather()) {
@@ -434,9 +473,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_ENTITY_CANNOT_TARGET: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -446,9 +488,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_MAID_AUTHORITY: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -458,9 +503,12 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                     case SET_MAID_ATTACK_DISCARD: {
                         if (Config.ALLOW_CHEAT_CONFIGS.get()) {
                             boolean value = Boolean.parseBoolean(message.data());
-                            if (tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
+                            String ruleKey = message.action().name();
+                            boolean alreadyUnlocked = settings.isRuleUnlocked(ruleKey);
+                            if (alreadyUnlocked || tryConsumeCosts(sender, maid, Config.DIMENSION_RULES_COST_POWER_POINTS.get(),
                                     Config.DIMENSION_RULES_COST_XP.get(), false)) {
                                 applySetting(message.action(), settings, value);
+                                settings.unlockRule(ruleKey);
                                 savedData.setDirty();
                                 syncSettings(sender, settings);
                             }
@@ -487,19 +535,13 @@ public record PersonalDimensionGuiPacket(Action action, String data, int maidId)
                         break;
 
                     case SET_DIMENSION_TYPE: {
-                        try {
-                            Config.DimensionType type = Config.DimensionType.valueOf(message.data());
-                            settings.setDimensionType(type);
+                        String dimensionTypeId = message.data().trim();
+                        if (!dimensionTypeId.isEmpty()) {
+                            settings.setDimensionTypeId(dimensionTypeId);
                             savedData.setDirty();
                             syncSettings(sender, settings);
-                            String typeNameKey = switch (type) {
-                                case VOID -> "gui.tlmpersonaldimension.dim_type.void";
-                                case NORMAL -> "gui.tlmpersonaldimension.dim_type.normal";
-                                case CHERRY -> "gui.tlmpersonaldimension.dim_type.cherry";
-                            };
                             sender.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.dim_type_set",
-                                    Component.translatable(typeNameKey)));
-                        } catch (Exception ignored) {
+                                    Component.literal(dimensionTypeId.toUpperCase())));
                         }
                     }
                         break;

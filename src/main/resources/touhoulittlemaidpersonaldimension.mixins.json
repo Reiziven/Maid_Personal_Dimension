@@ -6,7 +6,18 @@
   "mixins": [
     "BeehiveBlockEntityMixin",
     "ChunkGeneratorMixin",
-    "MinecraftServerMixin"
+    "MinecraftServerMixin",
+    "PorkysWorldTickProcedureMixin",
+    "SoulSeekerChooserEntityMixin",
+    "SoulSeekerDropperEntityMixin",
+    "SoulSeekerOverlayConditionMixin",
+    "SoulSeekerPlayerTickProcedureMixin",
+    "SoulSeekerScreamerEntityMixin",
+    "WeHateYouAmbientEventsMixin",
+    "WeHateYouChaseHandlerMixin",
+    "WeHateYouParanoiaEventsMixin",
+    "WeHateYouRandomEventsMixin",
+    "WeHateYouWorldSculptorMixin"
   ],
   "client": [],
   "injectors": {

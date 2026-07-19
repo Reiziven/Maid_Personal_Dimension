@@ -336,13 +336,16 @@ public class PersonalDimensionSavedData extends SavedData {
         private boolean entityCannotTarget = false;
         private boolean maidAuthority = false;
         private boolean maidAttackDiscard = false;
-        private Config.DimensionType dimensionType = null;
+        private String dimensionTypeId = null;  // Changed from enum to String for dynamic dimensions
 
         // Domain Expansion per-player overrides
         private boolean domainExpansionUseDimensionRules = true;
         private boolean domainExpansionUseEntityProtection = true;
         // Per-maid cooldown tracking: maid UUID string -> last activation time ms
         private final Map<String, Long> domainExpansionCooldowns = new HashMap<>();
+
+        // Rules that have been purchased at least once — player never pays again for these
+        private final Set<String> unlockedRules = new HashSet<>();
 
         public PlayerDimensionSettings() {
         }
@@ -389,8 +392,17 @@ public class PersonalDimensionSavedData extends SavedData {
                 settings.maidAuthority = tag.getBoolean("maidAuthority");
             if (tag.contains("maidAttackDiscard"))
                 settings.maidAttackDiscard = tag.getBoolean("maidAttackDiscard");
-            if (tag.contains("dimensionType"))
-                settings.dimensionType = Config.DimensionType.valueOf(tag.getString("dimensionType"));
+            if (tag.contains("dimensionType")) {
+                // Legacy: convert old enum values to new ID format
+                try {
+                    Config.DimensionType oldEnum = Config.DimensionType.valueOf(tag.getString("dimensionType"));
+                    settings.setDimensionTypeId(oldEnum.name().toLowerCase());
+                } catch (Exception e) {
+                    settings.setDimensionTypeId(tag.getString("dimensionType"));
+                }
+            }
+            if (tag.contains("dimensionTypeId"))
+                settings.setDimensionTypeId(tag.getString("dimensionTypeId"));
             // Domain expansion
             if (tag.contains("domainExpansionUseDimensionRules"))
                 settings.domainExpansionUseDimensionRules = tag.getBoolean("domainExpansionUseDimensionRules");
@@ -404,6 +416,11 @@ public class PersonalDimensionSavedData extends SavedData {
                 CompoundTag cdTag = tag.getCompound("domainExpansionCooldowns");
                 for (String key : cdTag.getAllKeys())
                     settings.domainExpansionCooldowns.put(key, cdTag.getLong(key));
+            }
+            if (tag.contains("unlockedRules")) {
+                ListTag list = tag.getList("unlockedRules", 8);
+                for (int i = 0; i < list.size(); i++)
+                    settings.unlockedRules.add(list.getString(i));
             }
             return settings;
         }
@@ -441,8 +458,8 @@ public class PersonalDimensionSavedData extends SavedData {
             tag.putBoolean("entityCannotTarget", entityCannotTarget);
             tag.putBoolean("maidAuthority", maidAuthority);
             tag.putBoolean("maidAttackDiscard", maidAttackDiscard);
-            if (dimensionType != null)
-                tag.putString("dimensionType", dimensionType.name());
+            if (dimensionTypeId != null)
+                tag.putString("dimensionTypeId", dimensionTypeId);
             // Domain expansion
             tag.putBoolean("domainExpansionUseDimensionRules", domainExpansionUseDimensionRules);
             tag.putBoolean("domainExpansionUseEntityProtection", domainExpansionUseEntityProtection);
@@ -450,6 +467,10 @@ public class PersonalDimensionSavedData extends SavedData {
             for (Map.Entry<String, Long> e : domainExpansionCooldowns.entrySet())
                 cdTag.putLong(e.getKey(), e.getValue());
             tag.put("domainExpansionCooldowns", cdTag);
+            ListTag unlockedList = new ListTag();
+            for (String rule : unlockedRules)
+                unlockedList.add(StringTag.valueOf(rule));
+            tag.put("unlockedRules", unlockedList);
             return tag;
         }
 
@@ -620,12 +641,19 @@ public class PersonalDimensionSavedData extends SavedData {
             this.maidAttackDiscard = maidAttackDiscard;
         }
 
-        public Config.DimensionType getDimensionType() {
-            return dimensionType;
+        public String getDimensionTypeId() {
+            return dimensionTypeId;
         }
 
-        public void setDimensionType(Config.DimensionType dimensionType) {
-            this.dimensionType = dimensionType;
+        public void setDimensionTypeId(String dimensionTypeId) {
+            if (dimensionTypeId == null) {
+                this.dimensionTypeId = null;
+                return;
+            }
+            // If someone stored a full ResourceLocation like "minecraft:the_end", extract just the path part
+            String id = dimensionTypeId.contains(":") ? dimensionTypeId.substring(dimensionTypeId.lastIndexOf(':') + 1) : dimensionTypeId;
+            // Always store lowercase, only [a-z0-9._-] allowed in ResourceLocation paths
+            this.dimensionTypeId = id.toLowerCase().replaceAll("[^a-z0-9._-]", "_");
         }
 
         public boolean isDomainExpansionUseDimensionRules() {
@@ -646,6 +674,14 @@ public class PersonalDimensionSavedData extends SavedData {
 
         public Map<String, Long> getDomainExpansionCooldowns() {
             return domainExpansionCooldowns;
+        }
+
+        public boolean isRuleUnlocked(String ruleKey) {
+            return unlockedRules.contains(ruleKey);
+        }
+
+        public void unlockRule(String ruleKey) {
+            unlockedRules.add(ruleKey);
         }
     }
 }

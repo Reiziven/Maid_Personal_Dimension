@@ -19,19 +19,6 @@ public class ModConfigScreen {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         ConfigCategory general = builder.getOrCreateCategory(Component.literal("General Settings"));
-        general.addEntry(entryBuilder.startEnumSelector(
-                Component.literal("Dimension Type"),
-                Config.DimensionType.class,
-                Config.DIMENSION_TYPE.get())
-                .setEnumNameProvider(en -> switch ((Config.DimensionType) en) {
-                    case VOID -> Component.literal("MAID ISLAND");
-                    case NORMAL -> Component.literal("OVERWORLD");
-                    case CHERRY -> Component.literal("CHERRY");
-                })
-                .setDefaultValue(Config.DimensionType.VOID)
-                .setTooltip(Component.literal("MAID ISLAND (Island only), OVERWORLD (World gen), CHERRY (Grove only)"))
-                .setSaveConsumer(Config.DIMENSION_TYPE::set)
-                .build());
         general.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Enable Structures"),
                 Config.ENABLE_STRUCTURES.get())
@@ -191,6 +178,25 @@ public class ModConfigScreen {
                 .setDefaultValue(List.of())
                 .setTooltip(Component.literal("Use entity IDs like 'minecraft:zombie' or wildcards like 'minecraft:*' to block all entities from a mod."))
                 .setSaveConsumer(Config.BLOCKED_ENTITIES::set)
+                .build());
+        entityProtection.addEntry(entryBuilder.startStrList(Component.literal("Mod Blocklist"), new ArrayList<>(Config.MOD_BLOCKLIST.get()))
+                .setDefaultValue(List.of())
+                .setTooltip(Component.literal("Block entire mods from the dimension. Add a mod's namespace/ID (e.g. 'somebigmod') to prevent all its entities from spawning. This is a higher-level block than per-entity entries."))
+                .setSaveConsumer(Config.MOD_BLOCKLIST::set)
+                .build());
+        entityProtection.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Domain Expansion Affected by Blocklist"),
+                Config.DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, mods in the blocklist are also blocked inside active domain expansion rule areas."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST::set)
+                .build());
+        entityProtection.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain Affected by Blocklist"),
+                Config.CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("If true, mods in the blocklist are also blocked inside active cherry domain rule areas."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST::set)
                 .build());
 
 
@@ -490,8 +496,8 @@ public class ModConfigScreen {
                 Config.DOMAIN_EXPANSION_DURATION_SECONDS.get())
                 .setDefaultValue(60)
                 .setMin(-1)
-                .setMax(3600)
-                .setTooltip(Component.literal("How long (in seconds) the domain expansion lasts before collapsing."))
+                .setMax(36000000)
+                .setTooltip(Component.literal("How long (in seconds) the domain expansion lasts before collapsing. Use -1 for infinite duration."))
                 .setSaveConsumer(Config.DOMAIN_EXPANSION_DURATION_SECONDS::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
@@ -521,6 +527,20 @@ public class ModConfigScreen {
                 .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, the Cherry Domain Bauble also creates an aura around the owner."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_AFFECTS_OWNER::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Domain Expansion Affected By Blocklist"),
+                Config.DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, mod blocklist effects also apply inside Domain Expansion areas."))
+                .setSaveConsumer(Config.DOMAIN_EXPANSION_AFFECTED_BY_BLOCKLIST::set)
+                .build());
+        domainExpansion.addEntry(entryBuilder.startBooleanToggle(
+                Component.literal("Cherry Domain Affected By Blocklist"),
+                Config.CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("If true, mod blocklist effects also apply inside Cherry Domain areas."))
+                .setSaveConsumer(Config.CHERRY_DOMAIN_AFFECTED_BY_BLOCKLIST::set)
                 .build());
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Cherry Domain: Use Dimension Rules"),
@@ -826,6 +846,45 @@ public class ModConfigScreen {
                 .setDefaultValue(true)
                 .setTooltip(Component.literal("If false, the Cat Familiar Bauble cannot be crafted at the altar. Still obtainable via commands."))
                 .setSaveConsumer(Config.CAT_FAMILIAR_BAUBLE_CRAFTABLE::set)
+                .build());
+
+        ConfigCategory customDimensions = builder.getOrCreateCategory(Component.literal("Custom Dimensions"));
+        customDimensions.addEntry(entryBuilder.startTextDescription(
+                Component.literal("§eDimension type can also be changed per-player in the Maid GUI (4th tab, favorability level 3 required)."))
+                .build());
+        customDimensions.addEntry(entryBuilder.startTextDescription(
+                Component.literal("§c⚠ New dimension types added here require a full game restart to take effect."))
+                .build());
+        customDimensions.addEntry(entryBuilder.startStrField(
+                Component.literal("Default Dimension Type ID"),
+                Config.DEFAULT_DIMENSION_TYPE_ID.get())
+                .setDefaultValue("void")
+                .setTooltip(Component.literal(
+                        "The dimension type assigned to new players by default.\n" +
+                        "Must match an ID from the list below (the part before the first '|').\n" +
+                        "Example: void, normal, cherry, nether, end\n" +
+                        "Players can still override this in the Maid GUI."))
+                .setSaveConsumer(Config.DEFAULT_DIMENSION_TYPE_ID::set)
+                .build());
+        customDimensions.addEntry(entryBuilder.startStrList(
+                Component.literal("Custom Dimension Templates"),
+                new ArrayList<>(Config.CUSTOM_DIMENSION_TEMPLATES.get()))
+                .setDefaultValue(List.of(
+                        "void|MAID ISLAND|touhoulittlemaidpersonaldimension:personal_dimension",
+                        "normal|OVERWORLD|touhoulittlemaidpersonaldimension:personal_dimension_normal",
+                        "cherry|CHERRY GROVE|touhoulittlemaidpersonaldimension:personal_dimension_cherry",
+                        "nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether",
+                        "end|THE END|touhoulittlemaidpersonaldimension:personal_dimension_end"
+                ))
+                .setTooltip(Component.literal(
+                        "List of dimension templates players can choose from.\n" +
+                        "Format: \"id|display_name|template_dimension_key\"\n" +
+                        "  id          - short unique name, lowercase, no spaces (e.g. void, nether)\n" +
+                        "  display_name - shown in Maid GUI (e.g. MAID ISLAND)\n" +
+                        "  template_key - dimension file to copy settings from\n" +
+                        "Example: \"nether|NETHER|touhoulittlemaidpersonaldimension:personal_dimension_nether\"\n" +
+                        "WARNING: Requires full game restart after adding new entries."))
+                .setSaveConsumer(Config.CUSTOM_DIMENSION_TEMPLATES::set)
                 .build());
 
         return builder.build();
