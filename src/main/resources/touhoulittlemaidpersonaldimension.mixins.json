@@ -1,0 +1,28 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.tlmpersonal.tlmpersonaldimension.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BeehiveBlockEntityMixin",
+    "ChunkGeneratorMixin",
+    "MinecraftServerMixin",
+    "PorkysPlayerTickProcedureMixin",
+    "PorkysWorldTickProcedureMixin",
+    "SoulSeekerChooserEntityMixin",
+    "SoulSeekerDropperEntityMixin",
+    "SoulSeekerOverlayConditionMixin",
+    "SoulSeekerPlayerTickProcedureMixin",
+    "SoulSeekerScreamerEntityMixin",
+    "WeHateYouAmbientEventsMixin",
+    "WeHateYouChaseHandlerMixin",
+    "WeHateYouParanoiaEventsMixin",
+    "WeHateYouPlayerTickMixin",
+    "WeHateYouRandomEventsMixin",
+    "WeHateYouWorldSculptorMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
