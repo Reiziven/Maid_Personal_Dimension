@@ -1759,6 +1759,18 @@ public class Touhoulittlemaidpersonaldimension {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onCatFamiliarDeath(LivingDeathEvent event) {
+        // Cancel death event for CatFamiliarEntity when being discarded (not truly dying).
+        // This prevents NPE in other mods' death event handlers that expect fully-valid entity data.
+        // Cat is truly dying only when health reaches 0; discard() calls happen for resummon/duplicate guard.
+        if (event.getEntity() instanceof CatFamiliarEntity cat) {
+            if (cat.isRemoved() || cat.getHealth() > 0.0f) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
     @SubscribeEvent
     public void onMaidDeath(LivingDeathEvent event) {
         // ---- MAID LIGHT CLEANUP ON DEATH ----
