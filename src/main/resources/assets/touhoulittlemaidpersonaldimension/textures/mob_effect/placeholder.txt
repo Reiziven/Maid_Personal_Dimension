@@ -1,0 +1,4 @@
+Drop effect icons here as PNG files:
+- cat_reflexes.png  → Cat Reflexes effect icon
+- feline_grace.png  → Feline Grace effect icon
+- bad_luck.png      → Bad Luck effect icon
