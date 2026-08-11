@@ -80,12 +80,23 @@ public class PersonalDimensionSavedData extends SavedData {
         return trackedMaids;
     }
 
+    private static PersonalDimensionSavedData cachedInstance = null;
+
+    public static void clearCache() {
+        cachedInstance = null;
+    }
+
     public static PersonalDimensionSavedData get(ServerLevel level) {
-        ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
-        return overworld.getDataStorage().computeIfAbsent(
-                PersonalDimensionSavedData::load,
-                PersonalDimensionSavedData::new,
-                DATA_NAME);
+        if (cachedInstance == null && level != null && level.getServer() != null) {
+            ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
+            if (overworld != null) {
+                cachedInstance = overworld.getDataStorage().computeIfAbsent(
+                        PersonalDimensionSavedData::load,
+                        PersonalDimensionSavedData::new,
+                        DATA_NAME);
+            }
+        }
+        return cachedInstance;
     }
 
     public PersonalDimensionSavedData() {}
