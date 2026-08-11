@@ -716,6 +716,18 @@ public class Touhoulittlemaidpersonaldimension {
         }
     }
 
+    @SubscribeEvent
+    public void onMaidJoinWorld(EntityJoinLevelEvent event) {
+        Entity entity = event.getEntity();
+        if (entity.level().isClientSide() || !(entity instanceof EntityMaid maid) || maid.getOwnerUUID() == null)
+            return;
+        ServerLevel serverLevel = (ServerLevel) entity.level();
+        PersonalDimensionSavedData savedData = PersonalDimensionSavedData.get(serverLevel);
+        savedData.getTrackedMaids().put(maid.getUUID(), new PersonalDimensionSavedData.MaidInfo(
+                maid.getOwnerUUID(), serverLevel.dimension(), maid.getX(), maid.getY(), maid.getZ()));
+        savedData.setDirty();
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onFinalizeSpawn(net.minecraftforge.event.entity.living.MobSpawnEvent.FinalizeSpawn event) {
         Entity entity = event.getEntity();
@@ -798,14 +810,6 @@ public class Touhoulittlemaidpersonaldimension {
                 level.dimension().location(), isOurDimension(level.dimension()));
         }
         if (level instanceof ServerLevel serverLevel) {
-            PersonalDimensionSavedData savedData = PersonalDimensionSavedData.get(serverLevel.getServer().getLevel(Level.OVERWORLD));
-            for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof EntityMaid maid && maid.getOwnerUUID() != null) {
-                    savedData.getTrackedMaids().put(maid.getUUID(), new PersonalDimensionSavedData.MaidInfo(
-                            maid.getOwnerUUID(), maid.level().dimension(), maid.getX(), maid.getY(), maid.getZ()));
-                }
-            }
-            savedData.setDirty();
             if (serverLevel.dimension().equals(Level.OVERWORLD) && !MAIDS_TO_TELEPORT.isEmpty()) {
                 List<MaidTeleportData> retryList = new ArrayList<>();
                 while (!MAIDS_TO_TELEPORT.isEmpty()) {
@@ -831,7 +835,11 @@ public class Touhoulittlemaidpersonaldimension {
             }
         }
         if (!(level instanceof ServerLevel serverLevel2) || !isOurDimension(level.dimension())) return;
-        StructurePlacer.tryPlaceStructure(serverLevel2);
+        
+        // Throttled structure generation check (every 100 ticks / 5 seconds)
+        if (serverLevel2.getGameTime() % 100 == 0) {
+            StructurePlacer.tryPlaceStructure(serverLevel2);
+        }
         int spawnChance = Config.MAID_SPAWN_CHANCE.get();
         if (spawnChance > 0 && serverLevel2.getGameTime() % 200 == 0) {
             String dimPath = serverLevel2.dimension().location().getPath();
@@ -867,17 +875,20 @@ public class Touhoulittlemaidpersonaldimension {
                 }
             }
         }
-        for (Entity entity : serverLevel2.getAllEntities()) {
-            if (entity.getY() < Config.FALL_PROTECTION_Y.get()) {
-                BlockPos safePos = findNearestSafeSurface(serverLevel2, (int) entity.getX(), (int) entity.getZ(), 16);
-                if (safePos == null) {
-                    TeleportLocation savedPos2 = getEntityPosition(entity.getUUID(), serverLevel2.dimension());
-                    if (savedPos2 != null) safePos = findNearestSafeSurface(serverLevel2, (int) savedPos2.x(), (int) savedPos2.z(), 16);
+        // Throttled void fall protection check (every 10 ticks / 0.5 seconds)
+        if (serverLevel2.getGameTime() % 10 == 0) {
+            for (Entity entity : serverLevel2.getAllEntities()) {
+                if (entity.getY() < Config.FALL_PROTECTION_Y.get()) {
+                    BlockPos safePos = findNearestSafeSurface(serverLevel2, (int) entity.getX(), (int) entity.getZ(), 16);
+                    if (safePos == null) {
+                        TeleportLocation savedPos2 = getEntityPosition(entity.getUUID(), serverLevel2.dimension());
+                        if (savedPos2 != null) safePos = findNearestSafeSurface(serverLevel2, (int) savedPos2.x(), (int) savedPos2.z(), 16);
+                    }
+                    if (safePos == null) safePos = findNearestSafeSurface(serverLevel2, 0, 0, 16);
+                    if (safePos != null) entity.teleportTo(safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5);
+                    else { serverLevel2.setBlockAndUpdate(new BlockPos(0, 99, 0), net.minecraft.world.level.block.Blocks.GLASS.defaultBlockState()); entity.teleportTo(0.5, 100, 0.5); }
+                    entity.fallDistance = 0;
                 }
-                if (safePos == null) safePos = findNearestSafeSurface(serverLevel2, 0, 0, 16);
-                if (safePos != null) entity.teleportTo(safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5);
-                else { serverLevel2.setBlockAndUpdate(new BlockPos(0, 99, 0), net.minecraft.world.level.block.Blocks.GLASS.defaultBlockState()); entity.teleportTo(0.5, 100, 0.5); }
-                entity.fallDistance = 0;
             }
         }
         if ((serverLevel2.getGameTime() + serverLevel2.dimension().hashCode()) % 40 != 0) return;
@@ -1166,9 +1177,17 @@ public class Touhoulittlemaidpersonaldimension {
         // Handle maid-specific logic
         if (livingEntity instanceof EntityMaid maid && maid.getOwnerUUID() != null) {
             PersonalDimensionSavedData savedData = PersonalDimensionSavedData.get(serverLevel);
-            savedData.getTrackedMaids().put(maid.getUUID(), new PersonalDimensionSavedData.MaidInfo(
-                    maid.getOwnerUUID(), serverLevel.dimension(), maid.getX(), maid.getY(), maid.getZ()));
-            savedData.setDirty();
+            if (serverLevel.getGameTime() % 100 == 0) {
+                PersonalDimensionSavedData.MaidInfo oldInfo = savedData.getTrackedMaids().get(maid.getUUID());
+                if (oldInfo == null || !oldInfo.lastLevel.equals(serverLevel.dimension())
+                        || Math.abs(oldInfo.lastX - maid.getX()) > 1.0
+                        || Math.abs(oldInfo.lastY - maid.getY()) > 1.0
+                        || Math.abs(oldInfo.lastZ - maid.getZ()) > 1.0) {
+                    savedData.getTrackedMaids().put(maid.getUUID(), new PersonalDimensionSavedData.MaidInfo(
+                            maid.getOwnerUUID(), serverLevel.dimension(), maid.getX(), maid.getY(), maid.getZ()));
+                    savedData.setDirty();
+                }
+            }
             
             UUID ownerId2 = maid.getOwnerUUID();
             PersonalDimensionSavedData.PlayerDimensionSettings lightSettings = savedData.getOrCreateSettings(ownerId2);
