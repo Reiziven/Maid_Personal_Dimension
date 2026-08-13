@@ -80,23 +80,18 @@ public class PersonalDimensionSavedData extends SavedData {
         return trackedMaids;
     }
 
-    private static PersonalDimensionSavedData cachedInstance = null;
-
-    public static void clearCache() {
-        cachedInstance = null;
-    }
-
     public static PersonalDimensionSavedData get(ServerLevel level) {
-        if (cachedInstance == null && level != null && level.getServer() != null) {
-            ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
-            if (overworld != null) {
-                cachedInstance = overworld.getDataStorage().computeIfAbsent(
-                        PersonalDimensionSavedData::load,
-                        PersonalDimensionSavedData::new,
-                        DATA_NAME);
-            }
+        if (level == null || level.getServer() == null) {
+            throw new IllegalArgumentException("A server level is required to access personal dimension data");
         }
-        return cachedInstance;
+        ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            throw new IllegalStateException("Overworld is unavailable while accessing personal dimension data");
+        }
+        return overworld.getDataStorage().computeIfAbsent(
+                PersonalDimensionSavedData::load,
+                PersonalDimensionSavedData::new,
+                DATA_NAME);
     }
 
     public PersonalDimensionSavedData() {}

@@ -256,11 +256,6 @@ public class DomainExpansionEntity extends Entity {
             applyEffects();
         }
 
-        // Apply maid light independently of entity protection
-        if (periodicTick % 20 == 0) {
-            applyMaidLight(serverLevel);
-        }
-
         // Continuously track new item/XP drops inside the domain so they survive
         // restore
         if (structureAABB != null) {
@@ -283,19 +278,20 @@ public class DomainExpansionEntity extends Entity {
 
         net.minecraft.world.phys.AABB searchAABB = structureAABB != null ? structureAABB
                 : this.getBoundingBox().inflate(RADIUS);
-        java.util.Set<UUID> maidsInRange = new java.util.HashSet<>();
 
         if (settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get()) {
             for (Entity e : serverLevel.getEntities(this, searchAABB)) {
                 if (!(e instanceof EntityMaid maid))
                     continue;
-                maidsInRange.add(maid.getUUID());
                 BlockPos newLightPos = maid.blockPosition().above();
                 Touhoulittlemaidpersonaldimension.MaidLightEntry lastEntry =
                         Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
                 BlockPos lastLightPos = lastEntry != null ? lastEntry.pos() : null;
+                if (lastEntry != null && lastEntry.dimension().equals(serverLevel.dimension()) && lastLightPos.equals(newLightPos)) {
+                    continue;
+                }
                 // Always remove old light first if maid has moved (uses right level via entry)
-                if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+                if (lastLightPos != null && (!lastEntry.dimension().equals(serverLevel.dimension()) || !lastLightPos.equals(newLightPos))) {
                     Touhoulittlemaidpersonaldimension.removeMaidLight(maid.getUUID(), serverLevel.getServer());
                 }
                 // Place new light if spot is free
@@ -315,7 +311,8 @@ public class DomainExpansionEntity extends Entity {
         // IMPORTANT: use entry.dimension() to get the right ServerLevel — do NOT use
         // serverLevel directly, the light may have been placed in a different dimension.
         Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
-            if (!maidsInRange.contains(entry.getKey())) {
+            if (entry.getValue().dimension().equals(serverLevel.dimension())
+                    && serverLevel.getEntity(entry.getKey()) == null) {
                 Touhoulittlemaidpersonaldimension.MaidLightEntry lightEntry = entry.getValue();
                 ServerLevel lightLevel = serverLevel.getServer().getLevel(lightEntry.dimension());
                 if (lightLevel != null && lightLevel.getBlockState(lightEntry.pos()).is(Blocks.LIGHT)) {
@@ -563,7 +560,9 @@ public class DomainExpansionEntity extends Entity {
                 }
             }
 
-            StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(false);
+            // Domain templates restore blocks only. Recreating stored entities can
+            // desynchronize passenger packets on clients.
+            StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(true);
 
             // Silently remove any blocks that would drop items when overwritten by the structure
             // (crops, plants, etc.) — prevents duplicate items when the domain restores them.
@@ -713,13 +712,5 @@ public class DomainExpansionEntity extends Entity {
         }
 
         // Clean up any maid light blocks left by this domain (uses correct level per entry)
-        Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
-            Touhoulittlemaidpersonaldimension.MaidLightEntry lightEntry = entry.getValue();
-            ServerLevel lightLevel = serverLevel.getServer().getLevel(lightEntry.dimension());
-            if (lightLevel != null && lightLevel.getBlockState(lightEntry.pos()).is(Blocks.LIGHT)) {
-                lightLevel.setBlockAndUpdate(lightEntry.pos(), Blocks.AIR.defaultBlockState());
-            }
-            return true;
-        });
     }
 }

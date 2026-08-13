@@ -2,6 +2,7 @@ write_file(
     absolutePath="C:/Users/PC/Desktop/Documentsa/PRIVATEDIMsemifinalSTRUCTURETRYCOPIA8/.gitignore",
     text="""# Gradle
 .gradle
+.gradle-*/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 

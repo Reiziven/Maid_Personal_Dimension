@@ -12,8 +12,11 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 import java.util.List;
+import java.util.Optional;
 
 public class DomainCommand {
 
@@ -45,7 +48,13 @@ public class DomainCommand {
                     .executes(ctx -> destroy(ctx, null)))                     // /domain destroy all
                 .then(Commands.argument("structure", StringArgumentType.word())
                     .executes(ctx -> destroy(ctx,
-                            StringArgumentType.getString(ctx, "structure"))))));
+                            StringArgumentType.getString(ctx, "structure")))))
+
+            // Read-only check for legacy island templates. It never changes a world.
+            .then(Commands.literal("inspect-island-template")
+                .executes(DomainCommand::inspectIslandTemplate))
+            .then(Commands.literal("inspect-island-entities")
+                .executes(DomainCommand::inspectIslandEntities)));
     }
 
     // ── summon ───────────────────────────────────────────────────────────────
@@ -136,5 +145,52 @@ public class DomainCommand {
         // We can read it by delegating to the entity
         String name = domain.getActiveStructureName();
         return name != null && name.equalsIgnoreCase(filter);
+    }
+
+    private static int inspectIslandTemplate(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        net.minecraft.resources.ResourceLocation id = new net.minecraft.resources.ResourceLocation(
+                Touhoulittlemaidpersonaldimension.MODID, "my_island");
+        Optional<StructureTemplate> template = level.getServer().getStructureManager().get(id);
+        if (template.isEmpty()) {
+            source.sendFailure(Component.literal("Could not load the my_island structure template."));
+            return 0;
+        }
+
+        net.minecraft.nbt.CompoundTag serialized = template.get().save(new net.minecraft.nbt.CompoundTag());
+        net.minecraft.nbt.ListTag entities = serialized.getList(StructureTemplate.ENTITIES_TAG, net.minecraft.nbt.Tag.TAG_COMPOUND);
+        int passengers = 0;
+        for (int i = 0; i < entities.size(); i++) {
+            net.minecraft.nbt.CompoundTag entity = entities.getCompound(i).getCompound(StructureTemplate.ENTITY_TAG_NBT);
+            if (entity.contains("Passengers", net.minecraft.nbt.Tag.TAG_LIST)) passengers++;
+        }
+
+        int count = entities.size();
+        int passengerCount = passengers;
+        source.sendSuccess(() -> Component.literal("my_island template: " + count
+                + " saved entities, " + passengerCount + " with passengers. No world data was changed."), false);
+        return count;
+    }
+
+    private static int inspectIslandEntities(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        List<Entity> entities = level.getEntities((Entity) null,
+                new net.minecraft.world.phys.AABB(-38, 150, -36, 38, 221, 36));
+        int passengerRoots = 0;
+        int mountedEntities = 0;
+        for (Entity entity : entities) {
+            if (entity.isPassenger()) mountedEntities++;
+            if (!entity.getPassengers().isEmpty()) passengerRoots++;
+        }
+
+        int entityCount = entities.size();
+        int rootCount = passengerRoots;
+        int mountedCount = mountedEntities;
+        source.sendSuccess(() -> Component.literal("Island range in " + level.dimension().location()
+                + ": " + entityCount + " loaded entities, " + rootCount + " passenger roots, "
+                + mountedCount + " passengers. No world data was changed."), false);
+        return entityCount;
     }
 }

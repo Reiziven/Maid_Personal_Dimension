@@ -50,9 +50,11 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.level.ExplosionEvent;
+import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerSetSpawnEvent;
@@ -106,6 +108,11 @@ public class Touhoulittlemaidpersonaldimension {
     private static final Map<ResourceKey<Level>, ConcurrentLinkedQueue<BlockPos>> PLACEMENT_QUEUE = new HashMap<>();
     private static final Map<ResourceKey<Level>, Set<ChunkPos>> PROCESSED_CHUNKS = new HashMap<>();
     private static final Map<ResourceKey<Level>, List<BlockPos>> GENERATED_ISLANDS = new HashMap<>();
+    private static final int VOID_PROTECTION_ENTITIES_PER_PASS = 32;
+    private static final int RULE_ENTITIES_PER_PASS = 64;
+    private static final int MAID_TELEPORTS_PER_TICK = 8;
+    private static final Map<ResourceKey<Level>, Set<UUID>> TRACKED_PERSONAL_ENTITIES = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Queue<UUID>> PERSONAL_ENTITY_QUEUES = new HashMap<>();
 
     /** Holds the position AND the dimension a maid's light block was placed in. */
     public record MaidLightEntry(BlockPos pos, ResourceKey<Level> dimension) {}
@@ -113,7 +120,8 @@ public class Touhoulittlemaidpersonaldimension {
     /** Tracks the last light block placed by each maid (UUID → entry with pos + dim). */
     public static final Map<UUID, MaidLightEntry> MAID_LIGHT_POSITIONS = new HashMap<>();
 
-    public static final Set<Entity> ACTIVE_DOMAINS = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    /** Active domains are tracked by stable identifiers, never by live entity references. */
+    private static final Map<ResourceKey<Level>, Set<UUID>> ACTIVE_DOMAINS = new HashMap<>();
 
     public static void removeMaidLight(UUID maidId, net.minecraft.server.MinecraftServer server) {
         MaidLightEntry entry = MAID_LIGHT_POSITIONS.remove(maidId);
@@ -121,6 +129,99 @@ public class Touhoulittlemaidpersonaldimension {
         ServerLevel lightLevel = server.getLevel(entry.dimension());
         if (lightLevel != null && lightLevel.getBlockState(entry.pos()).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
             lightLevel.setBlockAndUpdate(entry.pos(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+        }
+    }
+
+    public static void clearLevelRuntimeState(ServerLevel level) {
+        ResourceKey<Level> dimension = level.dimension();
+        ACTIVE_DOMAINS.remove(dimension);
+        TRACKED_PERSONAL_ENTITIES.remove(dimension);
+        PERSONAL_ENTITY_QUEUES.remove(dimension);
+
+        Iterator<Map.Entry<UUID, MaidLightEntry>> iterator = MAID_LIGHT_POSITIONS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            MaidLightEntry light = iterator.next().getValue();
+            if (!light.dimension().equals(dimension)) continue;
+            if (level.hasChunkAt(light.pos())
+                    && level.getBlockState(light.pos()).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+                level.setBlockAndUpdate(light.pos(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+            }
+            iterator.remove();
+        }
+    }
+
+    public static void updateMaidLight(EntityMaid maid, ServerLevel level, boolean enabled) {
+        UUID maidId = maid.getUUID();
+        MaidLightEntry current = MAID_LIGHT_POSITIONS.get(maidId);
+        if (!enabled) {
+            if (current != null) removeMaidLight(maidId, level.getServer());
+            return;
+        }
+
+        BlockPos target = maid.blockPosition().above();
+        MaidLightEntry targetEntry = new MaidLightEntry(target, level.dimension());
+        if (targetEntry.equals(current)) return;
+
+        if (current != null) removeMaidLight(maidId, level.getServer());
+        if (level.getBlockState(target).isAir() || level.getBlockState(target).is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+            level.setBlockAndUpdate(target, net.minecraft.world.level.block.Blocks.LIGHT.defaultBlockState());
+            MAID_LIGHT_POSITIONS.put(maidId, targetEntry);
+        }
+    }
+
+    private static Collection<Entity> getActiveDomains(ServerLevel level) {
+        Set<UUID> domainIds = ACTIVE_DOMAINS.get(level.dimension());
+        if (domainIds == null || domainIds.isEmpty()) return List.of();
+
+        List<Entity> domains = new ArrayList<>(domainIds.size());
+        Iterator<UUID> iterator = domainIds.iterator();
+        while (iterator.hasNext()) {
+            Entity domain = level.getEntity(iterator.next());
+            if (domain == null || domain.isRemoved()) iterator.remove();
+            else domains.add(domain);
+        }
+        if (domainIds.isEmpty()) ACTIVE_DOMAINS.remove(level.dimension());
+        return domains;
+    }
+
+    private static void registerActiveDomain(Entity entity) {
+        ACTIVE_DOMAINS.computeIfAbsent(entity.level().dimension(), unused -> new HashSet<>()).add(entity.getUUID());
+    }
+
+    private static void trackPersonalEntity(Entity entity) {
+        ResourceKey<Level> dimension = entity.level().dimension();
+        Set<UUID> tracked = TRACKED_PERSONAL_ENTITIES.computeIfAbsent(dimension, unused -> new HashSet<>());
+        if (tracked.add(entity.getUUID())) {
+            PERSONAL_ENTITY_QUEUES.computeIfAbsent(dimension, unused -> new ArrayDeque<>()).add(entity.getUUID());
+        }
+    }
+
+    private static void processTrackedPersonalEntities(ServerLevel level, int budget,
+                                                       java.util.function.Consumer<Entity> processor) {
+        ResourceKey<Level> dimension = level.dimension();
+        Set<UUID> tracked = TRACKED_PERSONAL_ENTITIES.get(dimension);
+        Queue<UUID> queue = PERSONAL_ENTITY_QUEUES.get(dimension);
+        if (tracked == null || queue == null) return;
+
+        int processed = 0;
+        int attempts = 0;
+        while (processed < budget && attempts++ < budget * 4) {
+            UUID entityId = queue.poll();
+            if (entityId == null) break;
+            if (!tracked.contains(entityId)) continue;
+            Entity entity = level.getEntity(entityId);
+            if (entity == null || entity.isRemoved()) {
+                tracked.remove(entityId);
+                continue;
+            }
+            processor.accept(entity);
+            processed++;
+            if (!entity.isRemoved() && tracked.contains(entityId)) queue.add(entityId);
+        }
+
+        if (tracked.isEmpty()) {
+            TRACKED_PERSONAL_ENTITIES.remove(dimension);
+            PERSONAL_ENTITY_QUEUES.remove(dimension);
         }
     }
 
@@ -149,29 +250,24 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     public static boolean isUnderDimensionRules(Entity entity) {
-        if (entity == null || entity.level().isClientSide || ACTIVE_DOMAINS.isEmpty()) return false;
-        synchronized (ACTIVE_DOMAINS) {
-            ACTIVE_DOMAINS.removeIf(Entity::isRemoved);
-            for (Entity domain : ACTIVE_DOMAINS) {
-                if (domain.level() == entity.level()) {
-                    if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity expansion) {
-                        if (expansion.isUsingDimensionRules()) {
-                            net.minecraft.world.phys.AABB aabb = expansion.getStructureAABB();
-                            if (aabb != null ? aabb.contains(entity.position())
-                                    : entity.position().distanceToSqr(expansion.position()) <= 32 * 32) {
-                                return true;
-                            }
-                        }
-                    } else if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity cherry) {
-                        if (cherry.isUsingDimensionRules()) {
-                            int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
-                            int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
-                            double dx = entity.getX() - cherry.getX();
-                            double dy = entity.getY() - cherry.getY();
-                            double dz = entity.getZ() - cherry.getZ();
-                            if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) return true;
-                        }
+        if (entity == null || entity.level().isClientSide || !(entity.level() instanceof ServerLevel level)) return false;
+        for (Entity domain : getActiveDomains(level)) {
+            if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity expansion) {
+                if (expansion.isUsingDimensionRules()) {
+                    net.minecraft.world.phys.AABB aabb = expansion.getStructureAABB();
+                    if (aabb != null ? aabb.contains(entity.position())
+                            : entity.position().distanceToSqr(expansion.position()) <= 32 * 32) {
+                        return true;
                     }
+                }
+            } else if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity cherry) {
+                if (cherry.isUsingDimensionRules()) {
+                    int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                    int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                    double dx = entity.getX() - cherry.getX();
+                    double dy = entity.getY() - cherry.getY();
+                    double dz = entity.getZ() - cherry.getZ();
+                    if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) return true;
                 }
             }
         }
@@ -179,27 +275,22 @@ public class Touhoulittlemaidpersonaldimension {
     }
 
     public static boolean isUnderDimensionRules(Level level, BlockPos pos) {
-        if (level.isClientSide || ACTIVE_DOMAINS.isEmpty()) return false;
-        synchronized (ACTIVE_DOMAINS) {
-            ACTIVE_DOMAINS.removeIf(Entity::isRemoved);
-            for (Entity domain : ACTIVE_DOMAINS) {
-                if (domain.level() == level) {
-                    if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity expansion) {
-                        if (expansion.isUsingDimensionRules()) {
-                            net.minecraft.world.phys.AABB aabb = expansion.getStructureAABB();
-                            if (aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
-                                    : pos.distSqr(expansion.blockPosition()) <= 32 * 32) return true;
-                        }
-                    } else if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity cherry) {
-                        if (cherry.isUsingDimensionRules()) {
-                            int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
-                            int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
-                            int dx = pos.getX() - cherry.blockPosition().getX();
-                            int dy = pos.getY() - cherry.blockPosition().getY();
-                            int dz = pos.getZ() - cherry.blockPosition().getZ();
-                            if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) return true;
-                        }
-                    }
+        if (level.isClientSide || !(level instanceof ServerLevel serverLevel)) return false;
+        for (Entity domain : getActiveDomains(serverLevel)) {
+            if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity expansion) {
+                if (expansion.isUsingDimensionRules()) {
+                    net.minecraft.world.phys.AABB aabb = expansion.getStructureAABB();
+                    if (aabb != null ? aabb.contains(pos.getX(), pos.getY(), pos.getZ())
+                            : pos.distSqr(expansion.blockPosition()) <= 32 * 32) return true;
+                }
+            } else if (domain instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity cherry) {
+                if (cherry.isUsingDimensionRules()) {
+                    int hRadius = Config.CHERRY_DOMAIN_HORIZONTAL_RADIUS.get();
+                    int vHalf = Config.CHERRY_DOMAIN_VERTICAL_HALF.get();
+                    int dx = pos.getX() - cherry.blockPosition().getX();
+                    int dy = pos.getY() - cherry.blockPosition().getY();
+                    int dz = pos.getZ() - cherry.blockPosition().getZ();
+                    if (dx * dx + dz * dz <= hRadius * hRadius && Math.abs(dy) <= vHalf) return true;
                 }
             }
         }
@@ -387,13 +478,15 @@ public class Touhoulittlemaidpersonaldimension {
         PROCESSED_CHUNKS.clear();
         PLACEMENT_QUEUE.clear();
         GENERATED_ISLANDS.clear();
+        TRACKED_PERSONAL_ENTITIES.clear();
+        PERSONAL_ENTITY_QUEUES.clear();
         DIMENSION_OWNER_CACHE.clear();
         MAIDS_TO_TELEPORT.clear();
         MAIDS_PENDING_TELEPORT.clear();
+        ACTIVE_DOMAINS.clear();
+        MAID_LIGHT_POSITIONS.clear();
         PlayerDimensionManager.clearCache();
         PlayerDimensionManager.preloadPersistedPersonalDimensionState(event.getServer());
-        ACTIVE_DOMAINS.clear();
-        PersonalDimensionSavedData.clearCache();
     }
 
     public static boolean isPlayerAllowed(Player player, UUID ownerId, ServerLevel level,
@@ -714,9 +807,10 @@ public class Touhoulittlemaidpersonaldimension {
         Entity entity = event.getEntity();
         if (entity != null && !entity.level().isClientSide() && (entity instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity
                 || entity instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity)) {
-            ACTIVE_DOMAINS.add(entity);
+            registerActiveDomain(entity);
         }
         if (entity == null || entity.level().isClientSide() || !isOurDimension(entity.level().dimension())) return;
+        trackPersonalEntity(entity);
         ServerLevel serverLevel = (ServerLevel) entity.level();
         UUID ownerId = getOwnerUUIDFromDimensionKey(serverLevel.dimension());
         if (ownerId == null) ownerId = getOwnerUUIDFromPosition(serverLevel, entity.getX(), entity.getZ());
@@ -726,6 +820,36 @@ public class Touhoulittlemaidpersonaldimension {
         if (!isAllowed(entity, ownerId, serverLevel, null)) {
             event.setCanceled(true);
             entity.discard();
+        }
+    }
+
+    @SubscribeEvent
+    public void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        Entity entity = event.getEntity();
+        Level departedLevel = event.getLevel();
+        if (entity != null && !departedLevel.isClientSide()
+                && (entity instanceof com.tlmpersonal.tlmpersonaldimension.entity.DomainExpansionEntity
+                || entity instanceof com.tlmpersonal.tlmpersonaldimension.entity.CherryDomainEntity)) {
+            Set<UUID> domainIds = ACTIVE_DOMAINS.get(departedLevel.dimension());
+            if (domainIds != null) {
+                domainIds.remove(entity.getUUID());
+                if (domainIds.isEmpty()) ACTIVE_DOMAINS.remove(departedLevel.dimension());
+            }
+        }
+        if (entity != null && !departedLevel.isClientSide() && isOurDimension(departedLevel.dimension())) {
+            Set<UUID> tracked = TRACKED_PERSONAL_ENTITIES.get(departedLevel.dimension());
+            if (tracked != null) {
+                tracked.remove(entity.getUUID());
+                Queue<UUID> queue = PERSONAL_ENTITY_QUEUES.get(departedLevel.dimension());
+                if (queue != null) queue.removeIf(entity.getUUID()::equals);
+                if (tracked.isEmpty()) {
+                    TRACKED_PERSONAL_ENTITIES.remove(departedLevel.dimension());
+                    PERSONAL_ENTITY_QUEUES.remove(departedLevel.dimension());
+                }
+            }
+        }
+        if (entity instanceof EntityMaid maid && departedLevel instanceof ServerLevel serverLevel) {
+            removeMaidLight(maid.getUUID(), serverLevel.getServer());
         }
     }
 
@@ -817,17 +941,12 @@ public class Touhoulittlemaidpersonaldimension {
         if (event.phase != TickEvent.Phase.END) return;
         Level level = event.level;
         
-        // Log every 200 ticks (10 seconds) to see if this event is firing
-        if (level instanceof ServerLevel sl && sl.getGameTime() % 200 == 0) {
-            LOGGER.info("LevelTick event firing for dimension: {}, isOurDimension: {}", 
-                level.dimension().location(), isOurDimension(level.dimension()));
-        }
         if (level instanceof ServerLevel serverLevel) {
             if (serverLevel.dimension().equals(Level.OVERWORLD) && !MAIDS_TO_TELEPORT.isEmpty()) {
                 List<MaidTeleportData> retryList = new ArrayList<>();
-                while (!MAIDS_TO_TELEPORT.isEmpty()) {
+                for (int processed = 0; processed < MAID_TELEPORTS_PER_TICK; processed++) {
                     MaidTeleportData data = MAIDS_TO_TELEPORT.poll();
-                    if (data == null) continue;
+                    if (data == null) break;
                     if (data.retries() >= MAX_MAID_TELEPORT_RETRIES) { MAIDS_PENDING_TELEPORT.remove(data.maidUuid()); continue; }
                     ServerLevel targetLevel = serverLevel.getServer().getLevel(data.targetDim());
                     if (targetLevel == null) { MAIDS_PENDING_TELEPORT.remove(data.maidUuid()); continue; }
@@ -886,7 +1005,7 @@ public class Touhoulittlemaidpersonaldimension {
         }
         // Throttled void fall protection check (every 10 ticks / 0.5 seconds)
         if (serverLevel2.getGameTime() % 10 == 0) {
-            for (Entity entity : serverLevel2.getAllEntities()) {
+            processTrackedPersonalEntities(serverLevel2, VOID_PROTECTION_ENTITIES_PER_PASS, entity -> {
                 if (entity.getY() < Config.FALL_PROTECTION_Y.get()) {
                     BlockPos safePos = findNearestSafeSurface(serverLevel2, (int) entity.getX(), (int) entity.getZ(), 16);
                     if (safePos == null) {
@@ -898,7 +1017,7 @@ public class Touhoulittlemaidpersonaldimension {
                     else { serverLevel2.setBlockAndUpdate(new BlockPos(0, 99, 0), net.minecraft.world.level.block.Blocks.GLASS.defaultBlockState()); entity.teleportTo(0.5, 100, 0.5); }
                     entity.fallDistance = 0;
                 }
-            }
+            });
         }
         if ((serverLevel2.getGameTime() + serverLevel2.dimension().hashCode()) % 40 != 0) return;
         UUID ownerId = getOwnerUUIDFromDimensionKey(serverLevel2.dimension());
@@ -908,32 +1027,19 @@ public class Touhoulittlemaidpersonaldimension {
         if (ownerId == null && !serverLevel2.players().isEmpty())
             ownerId = serverLevel2.players().iterator().next().getUUID();
         if (ownerId != null) {
-            PersonalDimensionSavedData.PlayerDimensionSettings settings = PersonalDimensionSavedData.get(serverLevel2).getOrCreateSettings(ownerId);
+            UUID finalOwnerId = ownerId;
+            PersonalDimensionSavedData.PlayerDimensionSettings settings = PersonalDimensionSavedData.get(serverLevel2).getOrCreateSettings(finalOwnerId);
             List<Entity> toRemove = new ArrayList<>();
-            Set<UUID> activeMaidUUIDs = new java.util.HashSet<>();
-            for (Entity entity : serverLevel2.getAllEntities()) {
-                boolean allowed = isAllowed(entity, ownerId, serverLevel2, settings);
+            processTrackedPersonalEntities(serverLevel2, RULE_ENTITIES_PER_PASS, entity -> {
+                boolean allowed = isAllowed(entity, finalOwnerId, serverLevel2, settings);
                 if (!allowed) {
                     toRemove.add(entity);
-                    if (toRemove.size() > 100) break;
-                    continue;
+                    return;
                 }
                 if (entity instanceof Player player && (settings.isDisableHunger() || Config.DISABLE_HUNGER.get()))
                     player.getFoodData().setFoodLevel(20);
                 if (entity instanceof LivingEntity living && (settings.isNaturalHealing() || Config.NATURAL_HEALING.get()) && living.getHealth() < living.getMaxHealth())
                     living.heal(1.0f);
-                if (entity instanceof EntityMaid maid && (settings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get()))
-                    activeMaidUUIDs.add(maid.getUUID());
-            }
-            MAID_LIGHT_POSITIONS.entrySet().removeIf(entry -> {
-                if (!activeMaidUUIDs.contains(entry.getKey())) {
-                    MaidLightEntry lightEntry = entry.getValue();
-                    ServerLevel lightLevel = serverLevel2.getServer().getLevel(lightEntry.dimension());
-                    if (lightLevel != null && lightLevel.getBlockState(lightEntry.pos()).is(net.minecraft.world.level.block.Blocks.LIGHT))
-                        lightLevel.setBlockAndUpdate(lightEntry.pos(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
-                    return true;
-                }
-                return false;
             });
             for (Entity entity : toRemove) processRemoval(entity);
             if (Config.ALLOW_CHEAT_CONFIGS.get()) {
@@ -947,8 +1053,18 @@ public class Touhoulittlemaidpersonaldimension {
     public void onLevelLoad(net.minecraftforge.event.level.LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
             if (isOurDimension(serverLevel.dimension())) {
+                for (Entity entity : serverLevel.getAllEntities()) {
+                    trackPersonalEntity(entity);
+                }
                 StructurePlacer.tryPlaceStructure(serverLevel);
             }
+        }
+    }
+
+    @SubscribeEvent
+    public void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            clearLevelRuntimeState(serverLevel);
         }
     }
 
@@ -1207,20 +1323,10 @@ public class Touhoulittlemaidpersonaldimension {
                 }
             }
             
-            UUID ownerId2 = maid.getOwnerUUID();
-            PersonalDimensionSavedData.PlayerDimensionSettings lightSettings = savedData.getOrCreateSettings(ownerId2);
-            if (lightSettings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get()) {
-                BlockPos newLightPos = maid.blockPosition().above();
-                MaidLightEntry lastEntry = MAID_LIGHT_POSITIONS.get(maid.getUUID());
-                BlockPos lastLightPos = lastEntry != null ? lastEntry.pos() : null;
-                if (lastLightPos != null && !lastLightPos.equals(newLightPos)) removeMaidLight(maid.getUUID(), serverLevel.getServer());
-                net.minecraft.world.level.block.state.BlockState atNew = serverLevel.getBlockState(newLightPos);
-                if (atNew.isAir() || atNew.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
-                    serverLevel.setBlockAndUpdate(newLightPos, net.minecraft.world.level.block.Blocks.LIGHT.defaultBlockState());
-                    MAID_LIGHT_POSITIONS.put(maid.getUUID(), new MaidLightEntry(newLightPos, serverLevel.dimension()));
-                } else if (lastLightPos != null && !lastLightPos.equals(newLightPos)) MAID_LIGHT_POSITIONS.remove(maid.getUUID());
-            } else { 
-                if (MAID_LIGHT_POSITIONS.containsKey(maid.getUUID())) removeMaidLight(maid.getUUID(), serverLevel.getServer()); 
+            if (serverLevel.getGameTime() % 10 == 0) {
+                UUID ownerId2 = maid.getOwnerUUID();
+                PersonalDimensionSavedData.PlayerDimensionSettings lightSettings = savedData.getOrCreateSettings(ownerId2);
+                updateMaidLight(maid, serverLevel, lightSettings.isMaidEmitLight() || Config.MAID_EMIT_LIGHT.get());
             }
         }
         
