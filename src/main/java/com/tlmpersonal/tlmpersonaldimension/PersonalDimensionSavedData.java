@@ -81,7 +81,13 @@ public class PersonalDimensionSavedData extends SavedData {
     }
 
     public static PersonalDimensionSavedData get(ServerLevel level) {
+        if (level == null || level.getServer() == null) {
+            throw new IllegalArgumentException("A server level is required to access personal dimension data");
+        }
         ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            throw new IllegalStateException("Overworld is unavailable while accessing personal dimension data");
+        }
         return overworld.getDataStorage().computeIfAbsent(
                 PersonalDimensionSavedData::load,
                 PersonalDimensionSavedData::new,

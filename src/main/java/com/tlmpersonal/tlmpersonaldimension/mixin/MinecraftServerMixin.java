@@ -1,16 +1,17 @@
 package com.tlmpersonal.tlmpersonaldimension.mixin;
 
 import com.google.common.collect.ImmutableList;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.JsonOps;
 import com.tlmpersonal.tlmpersonaldimension.PersonalLevelData;
 import com.tlmpersonal.tlmpersonaldimension.PersonalLevelStateData;
 import com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension;
 import com.tlmpersonal.tlmpersonaldimension.accessor.MinecraftServerAccessor;
-import com.tlmpersonal.tlmpersonaldimension.world.StructurePlacer;
-import com.tlmpersonal.tlmpersonaldimension.worldgen.accessor.ChunkGeneratorAccessor;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.progress.ChunkProgressListener;
@@ -75,7 +76,8 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
             }
 
             Holder<DimensionType> dimensionTypeHolder = templateStem.type();
-            LevelStem stemForNewLevel = new LevelStem(dimensionTypeHolder, templateStem.generator());
+            LevelStem stemForNewLevel = new LevelStem(dimensionTypeHolder,
+                    copyGenerator(templateStem.generator(), registryAccess));
 
             ServerLevel overworld = levels.get(Level.OVERWORLD);
             if (overworld == null) {
@@ -112,10 +114,6 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
 
             PersonalLevelStateData.get(newLevel).attach(personalLevelData);
 
-            if (newLevel.getChunkSource().getGenerator() instanceof ChunkGeneratorAccessor accessor) {
-                accessor.tlmpersonal$setDimensionKey(key);
-            }
-
             Touhoulittlemaidpersonaldimension.LOGGER.debug("Created dimension: {}", key.location());
 
             levels.put(key, newLevel);
@@ -133,12 +131,6 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
                 server.getClass().getMethod("markWorldsDirty").invoke(server);
             } catch (Exception ignored) {}
 
-            try {
-                StructurePlacer.forceStructurePlacement(newLevel);
-            } catch (Exception e) {
-                Touhoulittlemaidpersonaldimension.LOGGER.warn("Failed to place initial floating island structure for: {}", key.location(), e);
-            }
-
             Touhoulittlemaidpersonaldimension.LOGGER.info("Successfully created dimension: {}", key.location());
             return true;
 
@@ -148,11 +140,29 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<R
         }
     }
 
+    private static net.minecraft.world.level.chunk.ChunkGenerator copyGenerator(
+            net.minecraft.world.level.chunk.ChunkGenerator template,
+            net.minecraft.core.RegistryAccess registryAccess) {
+        DynamicOps<com.google.gson.JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, registryAccess);
+        com.google.gson.JsonElement encoded = net.minecraft.world.level.chunk.ChunkGenerator.CODEC
+                .encodeStart(ops, template)
+                .getOrThrow(false, message -> {
+                    throw new IllegalStateException("Could not encode personal dimension chunk generator: " + message);
+                });
+        return net.minecraft.world.level.chunk.ChunkGenerator.CODEC
+                .parse(ops, encoded)
+                .getOrThrow(false, message -> {
+                    throw new IllegalStateException("Could not decode personal dimension chunk generator: " + message);
+                });
+    }
+
     @Override
     public void tlmpersonal$removeWorld(ResourceKey<Level> key) {
         try {
-            ServerLevel level = levels.remove(key);
+            ServerLevel level = levels.get(key);
             if (level != null) {
+                Touhoulittlemaidpersonaldimension.clearLevelRuntimeState(level);
+                levels.remove(key);
                 Touhoulittlemaidpersonaldimension.LOGGER.info("Removed dimension: {}", key.location());
             }
         } catch (Exception e) {

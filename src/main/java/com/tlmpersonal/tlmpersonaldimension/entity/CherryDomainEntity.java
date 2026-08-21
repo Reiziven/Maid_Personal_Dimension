@@ -219,8 +219,6 @@ public class CherryDomainEntity extends Entity {
             applyEffects();
         }
 
-        applyMaidLight(serverLevel, maid);
-
         spawnCherryParticles(serverLevel, maid);
         if (Config.CHERRY_DOMAIN_AFFECTS_OWNER.get() && owner != null && owner.level() == serverLevel) {
             spawnCherryParticles(serverLevel, owner);
@@ -849,9 +847,12 @@ public class CherryDomainEntity extends Entity {
         Touhoulittlemaidpersonaldimension.MaidLightEntry lastEntry =
                 Touhoulittlemaidpersonaldimension.MAID_LIGHT_POSITIONS.get(maid.getUUID());
         BlockPos lastLightPos = lastEntry != null ? lastEntry.pos() : null;
+        if (lastEntry != null && lastEntry.dimension().equals(serverLevel.dimension()) && lastLightPos.equals(newLightPos)) {
+            return;
+        }
 
         // Always remove old light first if maid has moved (hits the right level via entry)
-        if (lastLightPos != null && !lastLightPos.equals(newLightPos)) {
+        if (lastLightPos != null && (!lastEntry.dimension().equals(serverLevel.dimension()) || !lastLightPos.equals(newLightPos))) {
             Touhoulittlemaidpersonaldimension.removeMaidLight(maid.getUUID(), serverLevel.getServer());
         }
         // Place new light if spot is free

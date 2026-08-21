@@ -20,7 +20,7 @@ public class StructurePlacer {
     private static final ResourceLocation STRUCTURE_ID =
         new ResourceLocation(Touhoulittlemaidpersonaldimension.MODID, "my_island");
 
-    private static Map<ResourceKey<Level>, Set<BlockPos>> placedIslands = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Set<BlockPos>> placedIslands = new HashMap<>();
 
     public static void resetForNewServer() {
         placedIslands.clear();
@@ -31,40 +31,24 @@ public class StructurePlacer {
         return 150;
     }
 
-    public static void tryPlaceStructure(ServerLevel level) {
+    /**
+     * The sole initial-island entry point. It can be reached by level loading,
+     * dynamic level creation, and player teleport in the same server tick.
+     */
+    public static boolean tryPlaceStructure(ServerLevel level) {
         PersonalDimensionSavedData data = PersonalDimensionSavedData.get(level);
         if (data.isIslandPlaced(level.dimension())) {
             Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Island already placed for dimension: {}", level.dimension().location());
-            return;
+            return true;
         }
 
         int spawnY = getSafeSpawnY(level, 0, 0);
-        placeStructureAt(level, new BlockPos(0, spawnY, 0));
-        data.markIslandPlaced(level.dimension());
-    }
-
-    /**
-     * Force structure placement without any checks - used on dimension creation
-     */
-    public static void forceStructurePlacement(ServerLevel level) {
-        Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] FORCE PLACEMENT starting for dimension: {}", level.dimension().location());
-        
-        int spawnY = getSafeSpawnY(level, 0, 0);
-        BlockPos targetPos = new BlockPos(0, spawnY, 0);
-        
-        Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Target position: {}", targetPos);
-        
-        // Place structure immediately
-        placeStructureAt(level, targetPos);
-        
-        // Mark as placed in saved data
-        try {
-            PersonalDimensionSavedData data = PersonalDimensionSavedData.get(level);
+        if (placeStructureAt(level, new BlockPos(0, spawnY, 0))) {
             data.markIslandPlaced(level.dimension());
             Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Marked island as placed in saved data");
-        } catch (Exception e) {
-            Touhoulittlemaidpersonaldimension.LOGGER.error("[StructurePlacer] Failed to mark island as placed", e);
+            return true;
         }
+        return false;
     }
     
     public static void trySpawnNaturalIsland(ServerLevel level) {
@@ -92,16 +76,17 @@ public class StructurePlacer {
             }
         }
         
-        placeStructureAt(level, spawnPos);
-        levelIslands.add(spawnPos);
-        Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Naturally spawned my_island at {}", spawnPos);
+        if (placeStructureAt(level, spawnPos)) {
+            levelIslands.add(spawnPos);
+            Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Naturally spawned my_island at {}", spawnPos);
+        }
     }
 
-    public static void placeSkyIsland(ServerLevel level, BlockPos pos) {
-        placeStructureAt(level, pos);
+    public static boolean placeSkyIsland(ServerLevel level, BlockPos pos) {
+        return placeStructureAt(level, pos);
     }
 
-    private static void placeStructureAt(ServerLevel level, BlockPos pos) {
+    private static boolean placeStructureAt(ServerLevel level, BlockPos pos) {
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] ===== STARTING STRUCTURE PLACEMENT =====");
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Dimension: {}", level.dimension().location());
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Structure ID: {}", STRUCTURE_ID);
@@ -111,7 +96,7 @@ public class StructurePlacer {
         StructureTemplate template = loadStructureManually(level, STRUCTURE_ID);
         if (template == null) {
             Touhoulittlemaidpersonaldimension.LOGGER.error("[StructurePlacer] ❌❌❌ Failed to load structure manually: {}", STRUCTURE_ID);
-            return;
+            return false;
         }
         
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Template size: X={}, Y={}, Z={}", 
@@ -119,7 +104,7 @@ public class StructurePlacer {
         
         if (template.getSize().getX() == 0) {
             Touhoulittlemaidpersonaldimension.LOGGER.error("[StructurePlacer] ❌❌❌ Structure has ZERO size!");
-            return;
+            return false;
         }
         
         BlockPos offset = new BlockPos(-template.getSize().getX() / 2, 0, -template.getSize().getZ() / 2);
@@ -145,18 +130,20 @@ public class StructurePlacer {
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Loaded {} chunks", chunksLoaded);
 
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] Calling template.placeInWorld...");
-        StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(false);
-        boolean placed = false;
+        // Templates are terrain-only. Do not recreate saved entities and their passengers.
+        StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(true);
         try {
-            placed = template.placeInWorld(level, finalPos, finalPos, settings, level.getRandom(), 2);
+            boolean placed = template.placeInWorld(level, finalPos, finalPos, settings, level.getRandom(), 2);
             Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] template.placeInWorld returned: {}", placed);
+            if (!placed) return false;
         } catch (Exception e) {
-            Touhoulittlemaidpersonaldimension.LOGGER.warn("[StructurePlacer] Exception during structure placement (some blocks may have failed): {}", e.getMessage());
-            placed = true; // Continue anyway, partial placement is better than nothing
+            Touhoulittlemaidpersonaldimension.LOGGER.warn("[StructurePlacer] Exception during structure placement", e);
+            return false;
         }
         
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] ✓✓✓ STRUCTURE PLACEMENT COMPLETED at {}", pos);
         Touhoulittlemaidpersonaldimension.LOGGER.info("[StructurePlacer] ===== END STRUCTURE PLACEMENT =====");
+        return true;
     }
 
     /**
