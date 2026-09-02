@@ -1,0 +1,38 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "touhoulittlemaidpersonaldimension:bauble_craftable",
+      "bauble": "cat_familiar_bauble"
+    }
+  ],
+  "type": "touhou_little_maid:altar_recipe_serializers",
+  "category": "misc",
+  "entity": "minecraft:item",
+  "group": "altar_recipe",
+  "ingredients": [
+    {
+      "item": "minecraft:amethyst_shard"
+    },
+    {
+      "item": "minecraft:nether_star"
+    },
+    {
+      "item": "minecraft:salmon"
+    },
+    {
+      "item": "minecraft:milk_bucket"
+    },
+    {
+      "item": "minecraft:ender_pearl"
+    },
+    {
+      "item": "minecraft:amethyst_shard"
+    }
+  ],
+  "lang": "jei.touhou_little_maid.altar_craft.item_craft.result",
+  "power": 5.0,
+  "result": {
+    "count": 1,
+    "id": "touhoulittlemaidpersonaldimension:cat_familiar_bauble"
+  }
+}
