@@ -176,10 +176,12 @@ public class PersonalDimensionGuiPacket {
         float[] powerRef = {0f};
         player.getCapability(PowerCapabilityProvider.POWER_CAP).ifPresent(cap -> powerRef[0] = cap.get());
         if (powerCostVal > 0.0 && powerRef[0] < (float) powerCostVal) {
-            player.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.not_enough_power")); return false;
+            player.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.not_enough_power",
+                    String.format("%.1f", powerCostVal), String.format("%.1f", powerRef[0]))); return false;
         }
         if (xpCost > 0 && player.experienceLevel < xpCost) {
-            player.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.not_enough_xp")); return false;
+            player.sendSystemMessage(Component.translatable("message.tlmpersonaldimension.not_enough_xp",
+                    xpCost, player.experienceLevel)); return false;
         }
         if (needCake) {
             if (!hasCake(player)) { player.sendSystemMessage(Component.literal("Need a cake to convince maid")); return false; }

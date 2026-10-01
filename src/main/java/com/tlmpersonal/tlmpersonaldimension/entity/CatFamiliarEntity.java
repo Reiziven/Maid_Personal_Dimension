@@ -162,15 +162,58 @@ public class CatFamiliarEntity extends Cat {
         return this.entityData.get(MAID_ID).orElse(null);
     }
 
+    /** Returns the player who owns the linked maid, or null if unavailable. */
+    @javax.annotation.Nullable
+    private Player getPlayerOwner() {
+        if (!(this.level() instanceof ServerLevel serverLevel)) return null;
+        EntityMaid maid = getMaidEntity(serverLevel);
+        if (maid == null) return null;
+        UUID playerUUID = maid.getOwnerUUID();
+        if (playerUUID == null) return null;
+        return serverLevel.getPlayerByUUID(playerUUID);
+    }
+
+    /**
+     * Returns the player owner so that other mods walking the ownership chain
+     * (e.g. via OwnableEntity) find a real player rather than stopping at the maid.
+     */
     @Override
     public LivingEntity getOwner() {
+        Player player = getPlayerOwner();
+        if (player != null) return player;
         if (this.level() instanceof ServerLevel serverLevel) {
             EntityMaid maid = getMaidEntity(serverLevel);
-            if (maid != null) {
-                return maid;
-            }
+            if (maid != null) return maid;
         }
         return super.getOwner();
+    }
+
+    /**
+     * Consider the cat allied to: itself, its linked maid, the player owner,
+     * and any other entity that shares a scoreboard team with the player owner.
+     * This covers the generic alliance check most mods use.
+     */
+    @Override
+    public boolean isAlliedTo(Entity entity) {
+        if (entity == this) return true;
+
+        // Maid is always an ally
+        if (this.level() instanceof ServerLevel serverLevel) {
+            EntityMaid maid = getMaidEntity(serverLevel);
+            if (maid != null && entity == maid) return true;
+        }
+
+        // Player owner is always an ally
+        Player player = getPlayerOwner();
+        if (player != null && entity == player) return true;
+
+        // Team-based check: cat joins the player's scoreboard team logically
+        if (player != null) {
+            net.minecraft.world.scores.Team playerTeam = player.getTeam();
+            if (playerTeam != null && playerTeam == entity.getTeam()) return true;
+        }
+
+        return super.isAlliedTo(entity);
     }
 
     boolean isNearMaidForIdleBehavior() {
@@ -471,11 +514,6 @@ public class CatFamiliarEntity extends Cat {
         // Check if owner is nearby (within 32 blocks)
         boolean ownerNearby = owner != null && owner.distanceToSqr(maid) <= 32 * 32;
 
-        // ALWAYS extend beneficial effect durations by 15%
-        extendBeneficialEffectDurations(maid);
-        if (ownerNearby)
-            extendBeneficialEffectDurations(owner);
-
         // Cat Reflexes is applied via onMaidOrOwnerHurt event, not here
 
         // Luck applied periodically (always on with cooldown system)
@@ -507,7 +545,7 @@ public class CatFamiliarEntity extends Cat {
 
     private void applyLuck(LivingEntity entity) {
         if (!entity.hasEffect(MobEffects.LUCK)) {
-            entity.addEffect(new MobEffectInstance(MobEffects.LUCK, 2400, 4, false, false, false)); // 2 minutes
+            entity.addEffect(new MobEffectInstance(MobEffects.LUCK, 2400, 1, false, false, false)); // 2 minutes
         }
     }
 
@@ -527,32 +565,6 @@ public class CatFamiliarEntity extends Cat {
                     com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension.FELINE_GRACE_EFFECT.get(),
                     600, 0, false, false, false)); // 30 seconds
         }
-    }
-
-    private void extendBeneficialEffectDurations(LivingEntity entity) {
-        // Create a copy of the effects list to avoid ConcurrentModificationException
-        java.util.List<MobEffectInstance> effectsCopy = new java.util.ArrayList<>(entity.getActiveEffects());
-
-        for (MobEffectInstance effect : effectsCopy) {
-            if (isBeneficialEffect(effect.getEffect())) {
-                int newDuration = (int) (effect.getDuration() * 1.15); // 15% extension
-                entity.removeEffect(effect.getEffect());
-                entity.addEffect(new MobEffectInstance(effect.getEffect(), newDuration, effect.getAmplifier(),
-                        effect.isAmbient(), effect.isVisible(), effect.showIcon()));
-            }
-        }
-    }
-
-    private boolean isBeneficialEffect(net.minecraft.world.effect.MobEffect effect) {
-        // Explicitly exclude effects with their own fixed duration managed separately
-        if (effect == com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension.CAT_REFLEXES_EFFECT.get())
-            return false;
-        if (effect == com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension.FELINE_GRACE_EFFECT.get())
-            return false;
-        return effect == MobEffects.LUCK
-                || effect == MobEffects.MOVEMENT_SPEED || effect == MobEffects.ABSORPTION
-                || effect == MobEffects.DAMAGE_RESISTANCE
-                || effect == MobEffects.FIRE_RESISTANCE || effect == MobEffects.WATER_BREATHING;
     }
 
     private void detectAndReportHostiles(ServerLevel serverLevel, EntityMaid maid) {

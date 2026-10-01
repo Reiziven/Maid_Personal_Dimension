@@ -340,7 +340,7 @@ public static final ForgeConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                 BUILDER.push("Private Dimension Settings");
                 PRIVATE_DIMENSION = BUILDER
                                 .comment("If true, each player's personal dimension is private, and teleporter items are bound to their owner")
-                                .define("privateDimension", false);
+                                .define("privateDimension", true);
                 BUILDER.pop();
 
                 BUILDER.push("Maid Entity Allowance & GUI Config");
@@ -495,7 +495,7 @@ public static final ForgeConfigSpec.IntValue CHERRY_DOMAIN_VERTICAL_HALF;
                         .define("cherryDomainGeneratePinkPetals", true);
                 CHERRY_DOMAIN_ENABLE_TORNADO = BUILDER
                         .comment("If true, Cherry Domain has a tornado border swirl of cherry leaves.")
-                        .define("cherryDomainEnableTornado", true);
+                        .define("cherryDomainEnableTornado", false);
                 CHERRY_DOMAIN_ENABLE_CHERRYFICATION = BUILDER
                         .comment("If true, Cherry Domain converts nearby blocks to cherry variants, spawns cherry particles on blocks, and converts sheep/boats to cherry/pink variants. Disabling this does NOT disable the tornado swirl.")
                         .define("cherryDomainEnableCherryfication", true);

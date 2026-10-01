@@ -1,5 +1,6 @@
 package com.tlmpersonal.tlmpersonaldimension.command;
 
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -14,6 +15,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 import java.util.Optional;
@@ -90,10 +93,23 @@ public class DomainCommand {
         domain.setDurationOverride(duration);
         domain.setCostOverride(cost);
 
-        // If executed by a player, set them as owner so effects/cost work
+        // If executed by a player, set them as owner and find their nearest maid
         try {
             ServerPlayer player = src.getPlayerOrException();
             domain.setOwnerId(player.getUUID());
+
+            // Find the nearest maid owned by this player
+            EntityMaid nearestMaid = level.getEntitiesOfClass(
+                            EntityMaid.class,
+                            AABB.ofSize(player.position(), 128, 128, 128))
+                    .stream()
+                    .filter(m -> m.isAlive() && player.getUUID().equals(m.getOwnerUUID()))
+                    .min(java.util.Comparator.comparingDouble(m -> m.distanceToSqr(player)))
+                    .orElse(null);
+
+            if (nearestMaid != null) {
+                domain.setMaidId(nearestMaid.getUUID());
+            }
         } catch (Exception ignored) {}
 
         level.addFreshEntity(domain);

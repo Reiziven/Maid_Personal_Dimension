@@ -108,7 +108,7 @@ public class ModConfigScreen {
         general.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Private Dimension"),
                 Config.PRIVATE_DIMENSION.get())
-                .setDefaultValue(false)
+                .setDefaultValue(true)
                 .setTooltip(Component.literal("If true, each player's personal dimension is private"))
                 .setSaveConsumer(Config.PRIVATE_DIMENSION::set)
                 .build());
@@ -555,7 +555,7 @@ public class ModConfigScreen {
         domainExpansion.addEntry(entryBuilder.startBooleanToggle(
                 Component.literal("Cherry Domain: Enable Tornado"),
                 Config.CHERRY_DOMAIN_ENABLE_TORNADO.get())
-                .setDefaultValue(true)
+                .setDefaultValue(false)
                 .setTooltip(Component.literal("If true, Cherry Domain has a tornado border swirl of cherry leaves."))
                 .setSaveConsumer(Config.CHERRY_DOMAIN_ENABLE_TORNADO::set)
                 .build());

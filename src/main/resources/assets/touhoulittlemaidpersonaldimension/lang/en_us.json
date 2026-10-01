@@ -103,8 +103,8 @@
   "gui.tlmpersonaldimension.dim_type.cherry": "CHERRY",
 
   "message.tlmpersonaldimension.favorability_too_low": "Maid favorability level is too low! Requires level 3.",
-  "message.tlmpersonaldimension.not_enough_power": "Not enough power points!",
-  "message.tlmpersonaldimension.not_enough_xp": "Not enough XP!",
+  "message.tlmpersonaldimension.not_enough_power": "Not enough power points! Need %s, have %s.",
+  "message.tlmpersonaldimension.not_enough_xp": "Not enough XP! Need %s levels, have %s.",
   "message.tlmpersonaldimension.cooldown": "Teleporter is on cooldown! Time remaining: %sm %ss",
   "message.tlmpersonaldimension.teleporter_given": "You received a Maid Personal Teleporter!",
   "message.tlmpersonaldimension.dim_type_set": "Dimension type set to: %s. Teleport again to enter the new world.",

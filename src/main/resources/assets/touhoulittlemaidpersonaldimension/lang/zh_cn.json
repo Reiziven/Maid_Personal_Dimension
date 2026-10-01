@@ -103,8 +103,8 @@
   "gui.tlmpersonaldimension.dim_type.cherry": "樱花",
 
   "message.tlmpersonaldimension.favorability_too_low": "女仆好感度过低！需要达到层级 3。",
-  "message.tlmpersonaldimension.not_enough_power": "灵力不足！",
-  "message.tlmpersonaldimension.not_enough_xp": "经验不足！",
+  "message.tlmpersonaldimension.not_enough_power": "灵力不足！需要 %s，当前 %s。",
+  "message.tlmpersonaldimension.not_enough_xp": "经验不足！需要 %s 级，当前 %s 级。",
   "message.tlmpersonaldimension.cooldown": "传送门正在冷却！剩余时间: %sm %ss",
   "message.tlmpersonaldimension.teleporter_given": "你收到了一个摩多罗之门！",
   "message.tlmpersonaldimension.dim_type_set": "维度类型已设置为: %s。再次传送以进入新世界。",

@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.tlmpersonal.tlmpersonaldimension.Config;
 import com.tlmpersonal.tlmpersonaldimension.Touhoulittlemaidpersonaldimension;
 import com.tlmpersonal.tlmpersonaldimension.PersonalDimensionSavedData;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -394,36 +395,73 @@ public class DomainExpansionEntity extends Entity {
                 }
                 // Apply combat buffs/debuffs only when entity protection effects are enabled
                 if (isUsingEntityProtection()) {
+                    // Resolve the maid once per tick (outside the entity loop is ideal but kept here for clarity)
+                    UUID maidId = getMaidId();
+                    EntityMaid domainMaid = null;
+                    if (maidId != null) {
+                        Entity maidEntity = serverLevel.getEntity(maidId);
+                        if (maidEntity instanceof EntityMaid m && m.isAlive()) {
+                            domainMaid = m;
+                        }
+                    }
+
                     if (e instanceof Player player) {
                         if (player.getUUID().equals(ownerId)) {
+                            // Owner always gets buffs
                             player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40,
                                     Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), false, false, true));
                             player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40,
                                     Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), false, false, true));
                             player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40,
                                     Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), false, false, true));
-                        } else {
+                        } else if (isMaidEnemy(domainMaid, player)) {
                             player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
                                     Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
                             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
                                     Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
                         }
                     } else if (e instanceof EntityMaid maid) {
-                        maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40,
-                                Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), false, false, true));
-                        maid.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40,
-                                Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), false, false, true));
-                        maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40,
-                                Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), false, false, true));
+                        UUID maidOwnerUUID = maid.getOwnerUUID();
+                        if (maidOwnerUUID != null && maidOwnerUUID.equals(ownerId)) {
+                            // Maids owned by the domain owner get buffs
+                            maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_STRENGTH.get(), false, false, true));
+                            maid.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_REGEN.get(), false, false, true));
+                            maid.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 40,
+                                    Config.DOMAIN_EXPANSION_ALLY_RESISTANCE.get(), false, false, true));
+                        } else if (isMaidEnemy(domainMaid, maid)) {
+                            maid.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
+                            maid.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
+                        }
                     } else if (e instanceof LivingEntity living) {
-                        living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
-                                Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
-                        living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
-                                Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
+                        if (isMaidEnemy(domainMaid, living)) {
+                            living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_WEAKNESS.get(), false, false, true));
+                            living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40,
+                                    Config.DOMAIN_EXPANSION_ENEMY_SLOWNESS.get(), false, false, true));
+                        }
                     }
                 }
             }
         }
+    }
+
+    private static boolean isMaidEnemy(@Nullable EntityMaid maid, LivingEntity entity) {
+        if (maid == null) return false;
+        UUID entityId = entity.getUUID();
+        // Maid is attacking this entity
+        LivingEntity target = maid.getTarget();
+        if (target != null && entityId.equals(target.getUUID())) return true;
+        // This entity is attacking the maid
+        LivingEntity attacker = maid.getLastHurtByMob();
+        if (attacker != null && entityId.equals(attacker.getUUID())) return true;
+        // Maid last hurt this entity
+        LivingEntity lastHurt = maid.getLastHurtMob();
+        if (lastHurt != null && entityId.equals(lastHurt.getUUID())) return true;
+        return false;
     }
 
     private static boolean willDropItems(BlockState state) {
