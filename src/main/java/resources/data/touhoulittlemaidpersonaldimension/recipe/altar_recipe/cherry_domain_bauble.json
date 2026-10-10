@@ -1,0 +1,38 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "touhoulittlemaidpersonaldimension:bauble_craftable",
+      "bauble": "cherry_domain_bauble"
+    }
+  ],
+  "type": "touhou_little_maid:altar_recipe_serializers",
+  "category": "misc",
+  "entity": "minecraft:item",
+  "group": "altar_recipe",
+  "ingredients": [
+    {
+      "item": "minecraft:pink_petals"
+    },
+    {
+      "item": "minecraft:ender_eye"
+    },
+    {
+      "item": "minecraft:nether_star"
+    },
+    {
+      "item": "minecraft:cherry_sapling"
+    },
+    {
+      "item": "minecraft:ender_pearl"
+    },
+    {
+      "item": "minecraft:amethyst_shard"
+    }
+  ],
+  "lang": "jei.touhou_little_maid.altar_craft.item_craft.result",
+  "power": 5.0,
+  "result": {
+    "count": 1,
+    "id": "touhoulittlemaidpersonaldimension:cherry_domain_bauble"
+  }
+}
