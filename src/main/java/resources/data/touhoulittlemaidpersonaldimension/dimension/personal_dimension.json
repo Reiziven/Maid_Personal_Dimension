@@ -1,0 +1,12 @@
+{
+  "type": "touhoulittlemaidpersonaldimension:personal_dimension",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "lakes": false,
+      "features": false,
+      "layers": [],
+      "biome": "touhoulittlemaidpersonaldimension:personal_biome"
+    }
+  }
+}
