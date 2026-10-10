@@ -1,7 +1,0 @@
-{
-  "type": "touhoulittlemaidpersonaldimension:cherry_portal",
-  "biomes": "#touhoulittlemaidpersonaldimension:has_structure/cherry_portal",
-  "step": "surface_structures",
-  "spawn_overrides": {},
-  "terrain_adaptation": "none"
-}
