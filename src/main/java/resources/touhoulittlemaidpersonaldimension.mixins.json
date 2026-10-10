@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "refmap": "touhoulittlemaidpersonaldimension.refmap.json",
+  "package": "com.tlmpersonal.tlmpersonaldimension.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "BeehiveBlockEntityMixin",
+    "ChunkGeneratorMixin",
+    "MinecraftServerMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,40 @@
+modLoader = "javafml"
+loaderVersion = "[46,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "touhoulittlemaidpersonaldimension"
+version = "${file.jarVersion}"
+displayName = "Touhou Little Maid: Maid Dimension"
+authors = "ReiZiven"
+description = '''
+An addon mod for Touhou Little Maid that adds personal dimension and domain expansion features for maids.
+'''
+
+[[dependencies.touhoulittlemaidpersonaldimension]]
+modId = "forge"
+mandatory = true
+versionRange = "[46,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.touhoulittlemaidpersonaldimension]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20,1.20.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.touhoulittlemaidpersonaldimension]]
+modId = "touhou_little_maid"
+mandatory = true
+versionRange = "[1.5.3,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.touhoulittlemaidpersonaldimension]]
+modId = "cloth_config"
+mandatory = true
+versionRange = "[11.0,)"
+ordering = "NONE"
+side = "BOTH"
